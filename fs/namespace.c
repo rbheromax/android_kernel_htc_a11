@@ -751,7 +751,7 @@ EXPORT_SYMBOL(replace_mount_options);
 #ifdef CONFIG_PROC_FS
 static void *m_start(struct seq_file *m, loff_t *pos)
 {
-	struct proc_mounts *p = container_of(m, struct proc_mounts, m);
+	struct proc_mounts *p = proc_mounts(m);
 
 	down_read(&namespace_sem);
 	return seq_list_start(&p->ns->list, *pos);
@@ -759,7 +759,7 @@ static void *m_start(struct seq_file *m, loff_t *pos)
 
 static void *m_next(struct seq_file *m, void *v, loff_t *pos)
 {
-	struct proc_mounts *p = container_of(m, struct proc_mounts, m);
+	struct proc_mounts *p = proc_mounts(m);
 
 	return seq_list_next(v, &p->ns->list, pos);
 }
@@ -771,7 +771,7 @@ static void m_stop(struct seq_file *m, void *v)
 
 static int m_show(struct seq_file *m, void *v)
 {
-	struct proc_mounts *p = container_of(m, struct proc_mounts, m);
+	struct proc_mounts *p = proc_mounts(m);
 	struct mount *r = list_entry(v, struct mount, mnt_list);
 	return p->show(m, &r->mnt);
 }
