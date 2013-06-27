@@ -1652,17 +1652,22 @@ static int prctl_set_vma_anon_name(unsigned long start, unsigned long end,
 	int unmapped_error = 0;
 	int error = -EINVAL;
 
+	/*
+	 * If the interval [start,end) covers some unmapped address
+	 * ranges, just ignore them, but return -ENOMEM at the end.
+	 * - this matches the handling in madvise.
+	 */
 	vma = find_vma_prev(current->mm, start, &prev);
 	if (vma && start > vma->vm_start)
 		prev = vma;
 
 	for (;;) {
-		
+		/* Still start < end. */
 		error = -ENOMEM;
 		if (!vma)
 			return error;
 
-		
+		/* Here start < (end|vma->vm_end). */
 		if (start < vma->vm_start) {
 			unmapped_error = -ENOMEM;
 			start = vma->vm_start;
@@ -1670,12 +1675,12 @@ static int prctl_set_vma_anon_name(unsigned long start, unsigned long end,
 				return error;
 		}
 
-		
+		/* Here vma->vm_start <= start < (end|vma->vm_end) */
 		tmp = vma->vm_end;
 		if (end < tmp)
 			tmp = end;
 
-		
+		/* Here vma->vm_start <= start < tmp <= (end|vma->vm_end). */
 		error = prctl_update_vma_anon_name(vma, &prev, start, end,
 				(const char __user *)arg);
 		if (error)
@@ -1688,7 +1693,7 @@ static int prctl_set_vma_anon_name(unsigned long start, unsigned long end,
 			return error;
 		if (prev)
 			vma = prev->vm_next;
-		else	
+		else	/* madvise_remove dropped mmap_sem */
 			vma = find_vma(current->mm, start);
 	}
 }
@@ -1705,7 +1710,11 @@ static int prctl_set_vma(unsigned long opt, unsigned long start,
 		return -EINVAL;
 	len = (len_in + ~PAGE_MASK) & PAGE_MASK;
 
+<<<<<<< HEAD
 	
+=======
+	/* Check to see whether len was rounded up from small -ve to zero */
+>>>>>>> 0fa571f... mm: add a field to store names for private anonymous memory
 	if (len_in && !len)
 		return -EINVAL;
 

@@ -147,6 +147,16 @@ struct vm_area_struct {
 
 	struct rb_node vm_rb;
 
+	/*
+	 * For areas with an address space and backing store,
+	 * linkage into the address_space->i_mmap prio tree, or
+	 * linkage to the list of like vmas hanging off its node, or
+	 * linkage of vma in the address_space->i_mmap_nonlinear list.
+	 *
+	 * For private anonymous mappings, a pointer to a null terminated string
+	 * in the user process containing the name given to the vma, or NULL
+	 * if unnamed.
+	 */
 	union {
 		struct {
 			struct list_head list;
@@ -297,6 +307,7 @@ static inline cpumask_t *mm_cpumask(struct mm_struct *mm)
 }
 
 
+/* Return the name for an anonymous mapping or NULL for a file-backed mapping */
 static inline const char __user *vma_get_anon_name(struct vm_area_struct *vma)
 {
 	if (vma->vm_file)
@@ -305,4 +316,4 @@ static inline const char __user *vma_get_anon_name(struct vm_area_struct *vma)
 	return vma->shared.anon_name;
 }
 
-#endif 
+#endif /* _LINUX_MM_TYPES_H */
