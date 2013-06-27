@@ -1711,11 +1711,7 @@ static int prctl_set_vma(unsigned long opt, unsigned long start,
 		return -EINVAL;
 	len = (len_in + ~PAGE_MASK) & PAGE_MASK;
 
-<<<<<<< HEAD
-	
-=======
 	/* Check to see whether len was rounded up from small -ve to zero */
->>>>>>> 0fa571f... mm: add a field to store names for private anonymous memory
 	if (len_in && !len)
 		return -EINVAL;
 
