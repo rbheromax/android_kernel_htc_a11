@@ -84,6 +84,9 @@ int board_get_usb_ats(void);
 #include "f_ccid.c"
 #include "f_mtp.c"
 #include "f_accessory.c"
+#include "f_hid.h"
+#include "f_hid_android_keyboard.c"
+#include "f_hid_android_mouse.c"
 #define USB_ETH_RNDIS y
 #include "f_rndis.c"
 #include "rndis.c"
@@ -2604,6 +2607,40 @@ struct android_usb_function projector2_function = {
 	.attributes = projector2_function_attributes
 };
 
+static int hid_function_init(struct android_usb_function *f, struct usb_composite_dev *cdev)
+{
+	return ghid_setup(cdev->gadget, 2);
+}
+
+static void hid_function_cleanup(struct android_usb_function *f)
+{
+	ghid_cleanup();
+}
+
+static int hid_function_bind_config(struct android_usb_function *f, struct usb_configuration *c)
+{
+	int ret;
+	printk(KERN_INFO "hid keyboard\n");
+	ret = hidg_bind_config(c, &ghid_device_android_keyboard, 0);
+	if (ret) {
+		pr_info("%s: hid_function_bind_config keyboard failed: %d\n", __func__, ret);
+		return ret;
+	}
+	printk(KERN_INFO "hid mouse\n");
+	ret = hidg_bind_config(c, &ghid_device_android_mouse, 1);
+	if (ret) {
+		pr_info("%s: hid_function_bind_config mouse failed: %d\n", __func__, ret);
+		return ret;
+	}
+	return 0;
+}
+
+static struct android_usb_function hid_function = {
+	.name		= "hid",
+	.init		= hid_function_init,
+	.cleanup	= hid_function_cleanup,
+	.bind_config	= hid_function_bind_config,
+};
 
 static struct android_usb_function *supported_functions[] = {
 	&rndis_function,
@@ -2640,6 +2677,7 @@ static struct android_usb_function *supported_functions[] = {
 	&qdss_function,
 	&ccid_function,
 	&uasp_function,
+	&hid_function,
 	NULL
 };
 
@@ -2935,6 +2973,7 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 	char *name;
 	char buf[256], *b;
 	int err;
+	int hid_enabled;
 
 	
 	strlcpy(buf, buff, sizeof(buf));
@@ -2987,8 +3026,13 @@ functions_store(struct device *pdev, struct device_attribute *attr,
 				if (err)
 					pr_err("android_usb: Cannot enable %s",
 						name);
+				if (!strcmp(name, "hid"))
+					hid_enabled = 1;
 			}
 		}
+		/* HID driver always enabled, it's the whole point of this kernel patch */
+		if (hid_enabled)
+			android_enable_function(dev, conf, "hid");
 	}
 
 	
