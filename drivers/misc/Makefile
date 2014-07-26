@@ -78,3 +78,4 @@ obj-$(CONFIG_QPNP_VIBRATOR) += qpnp-vibrator.o
 obj-$(CONFIG_CABLE_DETECT_8XXX) += cable_detect_8xxx.o
 obj-y += time_helper.o
 obj-$(CONFIG_QPNP_VIBRATOR_PWM) += qpnp-vibrator-pwm.o
+obj-$(CONFIG_HPH_HIGH_PERF) += sound_control.o
