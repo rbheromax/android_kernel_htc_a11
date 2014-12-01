@@ -33,12 +33,13 @@
 #include <trace/events/block.h>
 
 #include "blk.h"
+/*
 #ifdef CONFIG_MMC_MUST_PREVENT_WP_VIOLATION
 #include <linux/mmc/card.h>
 #include <mach/devices_cmdline.h>
 extern int get_partition_num_by_name(char *name);
 #endif	
-
+*/
 
 EXPORT_TRACEPOINT_SYMBOL_GPL(block_bio_remap);
 EXPORT_TRACEPOINT_SYMBOL_GPL(block_rq_remap);
@@ -1165,12 +1166,13 @@ generic_make_request_checks(struct bio *bio)
 	int err = -EIO;
 	char b[BDEVNAME_SIZE];
 	struct hd_struct *part;
+/*
 #ifdef CONFIG_MMC_MUST_PREVENT_WP_VIOLATION
 	unsigned char wp_ptn[64];
 #endif
-
+*/
 	might_sleep();
-
+/*
 #ifdef CONFIG_MMC_MUST_PREVENT_WP_VIOLATION
 	sprintf(wp_ptn, "mmcblk0p%d", get_partition_num_by_name("system"));
 	if (!strcmp(bdevname(bio->bi_bdev, b), wp_ptn) && !board_mfg_mode() &&
@@ -1186,7 +1188,7 @@ generic_make_request_checks(struct bio *bio)
 		goto wp_end_io;
 	}
 #endif
-
+*/
 	if (bio_check_eod(bio, nr_sectors))
 		goto end_io;
 
@@ -1256,12 +1258,13 @@ generic_make_request_checks(struct bio *bio)
 end_io:
 	bio_endio(bio, err);
 	return false;
-
+/*
 #ifdef CONFIG_MMC_MUST_PREVENT_WP_VIOLATION
 wp_end_io:
 	bio_endio(bio, err);
 	return 0;
 #endif
+*/
 }
 
 void generic_make_request(struct bio *bio)
