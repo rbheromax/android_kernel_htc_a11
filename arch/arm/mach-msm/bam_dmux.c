@@ -223,7 +223,7 @@ static struct workqueue_struct *bam_mux_tx_workqueue;
 
 static struct srcu_struct bam_dmux_srcu;
 
-#define UL_TIMEOUT_DELAY 1000	
+#define UL_TIMEOUT_DELAY 300	
 #define ENABLE_DISCONNECT_ACK	0x1
 #define SHUTDOWN_TIMEOUT_MS	1000
 #define UL_WAKEUP_TIMEOUT_MS	2000
