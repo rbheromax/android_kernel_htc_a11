@@ -128,6 +128,15 @@ config CPU_FREQ_DEFAULT_GOV_INTELLIDEMAND
 	   Use the CPUFreq governor 'intellidemand' as default. This is
 	   based on Ondemand with browsing detection based on GPU loading
 
+config CPU_FREQ_DEFAULT_GOV_BOOSTACTIVE
+	bool "boostactive"
+	select CPU_FREQ_GOV_BOOSTACTIVE
+	help
+	  Use the CPUFreq governor 'boostactive' as default. This allows
+	  you to get a full dynamic cpu frequency capable system by simply
+	  loading your cpufreq low-level hardware driver, using the
+	  'interactive' governor for latency-sensitive workloads.
+
 endchoice
 
 config CPU_FREQ_GOV_LIONHEART
@@ -293,6 +302,11 @@ config CPU_FREQ_GOV_INTELLIACTIVE
 	tristate "'intelliactive' cpufreq policy governor"
 	help
 	  'intelliactive' - This driver adds a dynamic cpufreq policy governor
+
+config CPU_FREQ_GOV_BOOSTACTIVE
+	tristate "'boostactive' cpufreq policy governor"
+	help
+	  'boostactive' - This driver adds a dynamic cpufreq policy governor
 	  designed for latency-sensitive workloads.
 
 	  This governor attempts to reduce the latency of clock

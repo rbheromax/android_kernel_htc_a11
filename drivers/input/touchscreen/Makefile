@@ -89,3 +89,4 @@ else
 obj-$(CONFIG_TOUCHSCREEN_HIMAX)   	+= himax_852xD.o
 endif
 obj-$(CONFIG_TOUCHSCREEN_GT9XX)		+= gt9xx/
+obj-y	+= touchboost.o
