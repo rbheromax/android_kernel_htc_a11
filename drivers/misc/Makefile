@@ -79,3 +79,7 @@ obj-$(CONFIG_CABLE_DETECT_8XXX) += cable_detect_8xxx.o
 obj-y += time_helper.o
 obj-$(CONFIG_QPNP_VIBRATOR_PWM) += qpnp-vibrator-pwm.o
 obj-$(CONFIG_HPH_HIGH_PERF) += sound_control.o
+obj-y += tspdrv/
+obj-$(CONFIG_BU52031NVX) += pm8xxx-cradle.o
+obj-$(CONFIG_SLIMPORT_ANX7808)	+= slimport_anx7808/
+obj-$(CONFIG_UID_CPUTIME) += uid_cputime.o
