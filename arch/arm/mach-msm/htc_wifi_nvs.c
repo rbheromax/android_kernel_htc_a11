@@ -25,11 +25,10 @@
 #include <linux/proc_fs.h>
 
 #include <asm/setup.h>
+#include <mach/htc_wifi_nvs.h>
 
 #include <linux/of.h>
 
-/* configuration tags specific to msm */
-//#define ATAG_MSM_WIFI	0x57494649 /* MSM WiFi */
 
 #define NVS_MAX_SIZE	0x800U
 #define NVS_LEN_OFFSET	0x0C
@@ -55,7 +54,7 @@ unsigned char *get_wifi_nvs_ram( void )
      p_size = 0;
      p_data = NULL;
      if (offset) {
-          /* of_get_property 會回傳property的address，並把長度填入*p_size */
+          
           p_data = (unsigned char*) of_get_property(offset, WIFI_FLASH_DATA, &p_size);
 #ifdef MSM_WIFI_DEBUG
           if (p_data) {
@@ -73,16 +72,16 @@ EXPORT_SYMBOL(get_wifi_nvs_ram);
 
 unsigned char* wlan_random_mac(unsigned char *set_mac_addr)
 {
-    static unsigned char mac_addr[6]={0,0,0,0,0,0};
-    if(set_mac_addr != NULL){
-        mac_addr[0]=set_mac_addr[0];
-        mac_addr[1]=set_mac_addr[1];
-        mac_addr[2]=set_mac_addr[2];
-        mac_addr[3]=set_mac_addr[3];
-        mac_addr[4]=set_mac_addr[4];
-        mac_addr[5]=set_mac_addr[5];
-    }
-    return mac_addr;
+	static unsigned char mac_addr[6]={0,0,0,0,0,0};
+	if(set_mac_addr != NULL){
+		mac_addr[0]=set_mac_addr[0];
+		mac_addr[1]=set_mac_addr[1];
+		mac_addr[2]=set_mac_addr[2];
+		mac_addr[3]=set_mac_addr[3];
+		mac_addr[4]=set_mac_addr[4];
+		mac_addr[5]=set_mac_addr[5];
+	}
+	return mac_addr;
 }
 EXPORT_SYMBOL(wlan_random_mac);
 
@@ -115,7 +114,7 @@ static unsigned wifi_get_nvs_size( void )
 	unsigned len;
 
 	ptr = get_wifi_nvs_ram();
-	/* Size in format LE assumed */
+	
 	memcpy(&len, ptr + NVS_LEN_OFFSET, sizeof(len));
 	len = min(len, (NVS_MAX_SIZE - NVS_DATA_OFFSET));
 	return len;
@@ -128,26 +127,38 @@ int wifi_calibration_size_set(void)
 	return 0;
 }
 
-static int wifi_calibration_read_proc(char *page, char **start, off_t off,
-					int count, int *eof, void *data)
+int htc_get_wifi_calibration(char *buf, int count)
 {
 	unsigned char *ptr;
 	unsigned len;
 
 	ptr = get_wifi_nvs_ram();
-	len = min(wifi_get_nvs_size(), (unsigned)count);
-	memcpy(page, ptr + NVS_DATA_OFFSET, len);
+	len = min(wifi_get_nvs_size(), (unsigned) count);
+	memcpy(buf, ptr + NVS_DATA_OFFSET, len);
 	return len;
 }
+EXPORT_SYMBOL(htc_get_wifi_calibration);
 
-static int wifi_data_read_proc(char *page, char **start, off_t off,
-					int count, int *eof, void *data)
+int htc_get_wifi_data(char *buf)
 {
 	unsigned char *ptr;
 
 	ptr = get_wifi_nvs_ram();
-	memcpy(page, ptr, NVS_DATA_OFFSET);
+	memcpy(buf, ptr, NVS_DATA_OFFSET);
 	return NVS_DATA_OFFSET;
+}
+EXPORT_SYMBOL(htc_get_wifi_data);
+
+static int wifi_calibration_read_proc(char *page, char **start, off_t off,
+					int count, int *eof, void *data)
+{
+	return htc_get_wifi_calibration(page, count);
+}
+
+static int wifi_data_read_proc(char *page, char **start, off_t off,
+		int count, int *eof, void *data)
+{
+	return htc_get_wifi_data(page);
 }
 
 static int __init wifi_nvs_init(void)
