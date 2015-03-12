@@ -394,14 +394,6 @@ struct mdss_dsi_ctrl_pdata {
 	struct dsi_panel_cmds cabc_ui_cmds;
 	struct dsi_panel_cmds cabc_video_cmds;
 	struct dsi_panel_cmds dimming_on_cmds;
-	struct dsi_panel_cmds frame_suffix_cmds;
-
-	int brt_dim;
-	int brt_min;
-	int brt_def;
-	int brt_high;
-	int brt_extra;
-	int brt_max;
 };
 
 int dsi_panel_device_register(struct device_node *pan_node,
@@ -466,6 +458,4 @@ void mdss_dsi_cmdlist_kickoff(int intf);
 int mdss_dsi_panel_init(struct device_node *node,
 		struct mdss_dsi_ctrl_pdata *ctrl_pdata,
 		bool cmd_cfg_cont_splash);
-void mdss_set_tx_power_mode(int mode, struct mdss_panel_data *pdata);
-
 #endif 

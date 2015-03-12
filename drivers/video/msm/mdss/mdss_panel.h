@@ -277,7 +277,6 @@ struct mdss_panel_info {
 	int max_brt;
 	int act_max_brt;
 	bool act_brt;
-	bool even_roi;
 };
 
 struct mdss_panel_data {

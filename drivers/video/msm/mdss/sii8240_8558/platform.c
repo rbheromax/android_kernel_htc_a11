@@ -1109,35 +1109,6 @@ static int __devinit si_8240_8558_mhl_tx_i2c_probe(struct i2c_client *client,
 	return ret;
 }
 
-#ifdef CONFIG_PM_SLEEP
-static int mhl_pm_suspend(struct device *dev)
-{
-	struct mhl_dev_context	*dev_context = dev_get_drvdata(dev);
-	if (!dev_context)
-		return -ENODEV;
-
-	dev_dbg(dev, "mhl pm suspend\n");
-
-	disable_irq_nosync(dev_context->client->irq);
-	return 0;
-}
-
-static int mhl_pm_resume(struct device *dev)
-{
-	struct mhl_dev_context	*dev_context = dev_get_drvdata(dev);
-	if (!dev_context)
-		return -ENODEV;
-
-	dev_dbg(dev, "mhl pm resume\n");
-
-	enable_irq(dev_context->client->irq);
-	return 0;
-}
-#else
-#define mhl_pm_suspend NULL
-#define mhl_pm_resume NULL
-#endif
-
 static int __devexit si_8240_8558_mhl_tx_remove(struct i2c_client *client)
 {
 	return 0;
@@ -1155,16 +1126,11 @@ static struct of_device_id mhl_match_table[] = {
 	{ },
 };
 
-static const struct dev_pm_ops mhl_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(mhl_pm_suspend, mhl_pm_resume)
-};
-
 static struct i2c_driver si_8240_8558_mhl_tx_i2c_driver = {
 	.driver = {
 		   .owner = THIS_MODULE,
 		   .name = MHL_DRIVER_NAME,
 		   .of_match_table = mhl_match_table,
-		   .pm = &mhl_pm_ops,
 		   },
 	.id_table = si_8240_8558_mhl_tx_id,
 	.probe = si_8240_8558_mhl_tx_i2c_probe,

@@ -35,6 +35,5 @@ void htc_reset_status(void);
 void htc_dimming_on(struct msm_fb_data_type *mfd);
 void htc_debugfs_init(struct msm_fb_data_type *mfd);
 void htc_set_pp_pa(struct mdss_mdp_ctl *ctl);
-void htc_set_pp_pcc(struct mdss_mdp_ctl *ctl);
 
 #endif 

@@ -26,6 +26,7 @@
 #include "mdss_panel.h"
 #include "mdss_dsi.h"
 #include "mdss_debug.h"
+#include "xlog.h"
 
 static unsigned char *mdss_dsi_base;
 struct mdss_dsi_pwrctrl pwrctrl_pdata;
@@ -770,6 +771,8 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 				panel_data);
 	pr_debug("%s+:event=%d\n", __func__, event);
 
+	XLOG(__func__, event, (int)arg, ctrl_pdata->ndx, 0, 0, 0x3333);
+
 	switch (event) {
 	case MDSS_EVENT_UNBLANK:
 		rc = mdss_dsi_on(pdata);
@@ -844,7 +847,6 @@ static struct device_node *mdss_dsi_find_panel_of_node(
 	struct device_node *dsi_pan_node = NULL, *mdss_node = NULL;
 
 	l = strlen(panel_cfg);
-
 	if (!l) {
 		
 		pr_debug("%s:%d: no cmd line cfg present\n",
@@ -871,7 +873,7 @@ static struct device_node *mdss_dsi_find_panel_of_node(
 			return NULL;
 		}
 		panel_name = panel_cfg + 2;
-		pr_err("%s:%d:%s:%s\n", __func__, __LINE__,
+		pr_debug("%s:%d:%s:%s\n", __func__, __LINE__,
 			 panel_cfg, panel_name);
 
 		mdss_node = of_parse_phandle(pdev->dev.of_node,
