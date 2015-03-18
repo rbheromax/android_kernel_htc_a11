@@ -9,3 +9,9 @@ config SRCARCH
 	option env="SRCARCH"
 
 source "arch/$SRCARCH/Kconfig"
+
+config NO_ERROR_ON_MISMATCH
+	bool "No error on symbol mismatches"
+	default n
+	help
+	   Fix compile for some targets
