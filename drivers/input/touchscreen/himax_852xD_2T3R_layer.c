@@ -55,6 +55,10 @@
 #define FAKE_EVENT
 #define SUPPORT_FINGER_DATA_CHECKSUM 0x0F
 
+#ifdef CONFIG_TOUCHSCREEN_PREVENT_SLEEP
+#include <linux/input/sweep2wake.h>
+#include <linux/input/doubletap2wake.h>
+#endif
 
 #define D(x...) printk(KERN_DEBUG "[TP] " x)
 #define I(x...) printk(KERN_INFO "[TP] " x)
@@ -4945,7 +4949,7 @@ static int updateFirmware(void *arg)
 	uint32_t fw_version = 0;
 	struct himax_ts_data *ts = (struct himax_ts_data *)arg;
 
-	
+W	
 	ret = request_firmware(&ts->fw, HMX_FW_NAME, &ts->client->dev);
 	if (ts->fw == NULL) {
 		E("[FW] No firmware file, ignored firmware update\n");
@@ -7326,8 +7330,12 @@ static int himax8528_suspend(struct device *dev)
 	}
 	else
 	{
-		ts->suspended = true;
-		I("%s: enter\n", __func__);
+		I("%s: skipping\n", __func__);
+		himax_int_enable(1);
+		atomic_set(&ts->suspend_mode, 1);
+		ts->first_pressed = 0;
+		ts->pre_finger_mask = 0;
+		return 0;
 	}
 
 	if (atomic_read(&ts->in_flash)) {
@@ -7396,7 +7404,6 @@ static int himax8528_suspend(struct device *dev)
 			himax_int_enable(1);
 	}
 
-	
 	atomic_set(&ts->suspend_mode, 1);
 	ts->pre_finger_mask = 0;
 	if (ts->pdata->powerOff3V3 && ts->pdata->power)
@@ -7405,7 +7412,6 @@ static int himax8528_suspend(struct device *dev)
 	#if defined (CONFIG_UX500_SOC_DB8500)
 	himax8528_hw_disable(ts);
 	#endif
-
 	return 0;
 }
 

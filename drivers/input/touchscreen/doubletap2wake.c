@@ -56,7 +56,7 @@ MODULE_LICENSE("GPLv2");
 
 /* Tuneables */
 #define DT2W_DEBUG		0
-#define DT2W_DEFAULT		0
+#define DT2W_DEFAULT		1
 
 #define DT2W_PWRKEY_DUR		60
 #define DT2W_FEATHER		200
@@ -219,8 +219,8 @@ static void dt2w_input_event(struct input_handle *handle, unsigned int type,
 }
 
 static int input_dev_filter(struct input_dev *dev) {
-	if (strstr(dev->name, "touch") ||
-	    strstr(dev->name, "synaptics_dsx_i2c")) {
+	if (strstr(dev->name, "android_touch") ||
+	    strstr(dev->name, "himax-touchscreen")) {
 		return 0;
 	} else {
 		return 1;
@@ -254,6 +254,7 @@ static int dt2w_input_connect(struct input_handler *handler,
 	return 0;
 err1:
 	input_unregister_handle(handle);
+
 err2:
 	kfree(handle);
 	return error;
