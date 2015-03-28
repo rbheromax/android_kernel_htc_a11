@@ -217,11 +217,17 @@ static void adreno_input_work(struct work_struct *work)
 			struct adreno_device, input_work);
 	struct kgsl_device *device = &adreno_dev->dev;
 
+	if (!_wake_timeout)
+		return;
+
 	kgsl_mutex_lock(&device->mutex, &device->mutex_owner);
 
 	device->flags |= KGSL_FLAG_WAKE_ON_TOUCH;
 
-	kgsl_pwrctrl_wake(device, 0);
+	/*
+	 * Schedule adreno_start in a high priority workqueue.
+	 */
+	kgsl_pwrctrl_wake(device, 1);
 
 	mod_timer(&device->idle_timer,
 		jiffies + msecs_to_jiffies(_wake_timeout));
