@@ -2850,11 +2850,15 @@ struct usb_ma_limit_entry {
 };
 
 static struct usb_ma_limit_entry usb_ma_table[] = {
+#ifdef CONFIG_FAST_CHARGE
+/* Comment these out */
+#else
 	{100},
 	{500},
 	{700},
 	{800},
 	{900},
+#endif
 	{1000},
 	{1100},
 	{1200},
