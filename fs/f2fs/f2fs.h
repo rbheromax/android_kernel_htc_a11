@@ -210,6 +210,7 @@ struct f2fs_inode_info {
 
 	/* Use below internally in f2fs*/
 	unsigned long flags;		/* use to pass per-file flags */
+	struct rw_semaphore i_sem;	/* protect fi info */
 	atomic_t dirty_dents;		/* # of dirty dentry pages */
 	f2fs_hash_t chash;		/* hash value of given file name */
 	unsigned int clevel;		/* maximum level of given file name */
@@ -242,6 +243,7 @@ struct f2fs_nm_info {
 	block_t nat_blkaddr;		/* base disk address of NAT */
 	nid_t max_nid;			/* maximum possible node ids */
 	nid_t next_scan_nid;		/* the next nid to be scanned */
+	unsigned int ram_thresh;	/* control the memory footprint */
 
 	/* NAT cache management */
 	struct radix_tree_root nat_root;/* root of the nat entry cache */
@@ -637,6 +639,11 @@ static inline int F2FS_HAS_BLOCKS(struct inode *inode)
 		return inode->i_blocks > F2FS_DEFAULT_ALLOCATED_BLOCKS;
 }
 
+static inline bool f2fs_has_xattr_block(unsigned int ofs)
+{
+	return ofs == XATTR_NODE_OFFSET;
+}
+
 static inline bool inc_valid_block_count(struct f2fs_sb_info *sbi,
 				 struct inode *inode, blkcnt_t count)
 {
@@ -697,6 +704,11 @@ static inline void inode_dec_dirty_dents(struct inode *inode)
 static inline int get_pages(struct f2fs_sb_info *sbi, int count_type)
 {
 	return atomic_read(&sbi->nr_pages[count_type]);
+}
+
+static inline int get_dirty_dents(struct inode *inode)
+{
+	return atomic_read(&F2FS_I(inode)->dirty_dents);
 }
 
 static inline int get_blocktype_secs(struct f2fs_sb_info *sbi, int block_type)
@@ -991,9 +1003,14 @@ static inline void set_raw_inline(struct f2fs_inode_info *fi,
 		ri->i_inline |= F2FS_INLINE_DATA;
 }
 
+static inline int f2fs_has_inline_xattr(struct inode *inode)
+{
+	return is_inode_flag_set(F2FS_I(inode), FI_INLINE_XATTR);
+}
+
 static inline unsigned int addrs_per_inode(struct f2fs_inode_info *fi)
 {
-	if (is_inode_flag_set(fi, FI_INLINE_XATTR))
+	if (f2fs_has_inline_xattr(&fi->vfs_inode))
 		return DEF_ADDRS_PER_INODE - F2FS_INLINE_XATTR_ADDRS;
 	return DEF_ADDRS_PER_INODE;
 }
@@ -1007,7 +1024,7 @@ static inline void *inline_xattr_addr(struct page *page)
 
 static inline int inline_xattr_size(struct inode *inode)
 {
-	if (is_inode_flag_set(F2FS_I(inode), FI_INLINE_XATTR))
+	if (f2fs_has_inline_xattr(inode))
 		return F2FS_INLINE_XATTR_ADDRS << 2;
 	else
 		return 0;

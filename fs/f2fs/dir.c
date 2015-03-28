@@ -253,7 +253,7 @@ void f2fs_set_link(struct inode *dir, struct f2fs_dir_entry *de,
 		struct page *page, struct inode *inode)
 {
 	lock_page(page);
-	wait_on_page_writeback(page);
+	f2fs_wait_on_page_writeback(page, DATA);
 	de->ino = cpu_to_le32(inode->i_ino);
 	set_de_type(de, inode);
 	kunmap(page);
@@ -352,14 +352,11 @@ static struct page *init_inode_metadata(struct inode *inode,
 		err = f2fs_init_security(inode, dir, name, page);
 		if (err)
 			goto put_error;
-
-		wait_on_page_writeback(page);
 	} else {
 		page = get_node_page(F2FS_SB(dir->i_sb), inode->i_ino);
 		if (IS_ERR(page))
 			return page;
 
-		wait_on_page_writeback(page);
 		set_cold_node(inode, page);
 	}
 
@@ -494,8 +491,9 @@ start:
 	++level;
 	goto start;
 add_dentry:
-	wait_on_page_writeback(dentry_page);
+	f2fs_wait_on_page_writeback(dentry_page, DATA);
 
+	down_write(&F2FS_I(inode)->i_sem);
 	page = init_inode_metadata(inode, dir, name);
 	if (IS_ERR(page)) {
 		err = PTR_ERR(page);
@@ -518,6 +516,8 @@ add_dentry:
 
 	update_parent_metadata(dir, inode, current_depth);
 fail:
+	up_write(&F2FS_I(inode)->i_sem);
+
 	if (is_inode_flag_set(F2FS_I(dir), FI_UPDATE_DIR)) {
 		update_inode_page(dir);
 		clear_inode_flag(F2FS_I(dir), FI_UPDATE_DIR);
@@ -543,7 +543,7 @@ void f2fs_delete_entry(struct f2fs_dir_entry *dentry, struct page *page,
 	int i;
 
 	lock_page(page);
-	wait_on_page_writeback(page);
+	f2fs_wait_on_page_writeback(page, DATA);
 
 	dentry_blk = (struct f2fs_dentry_block *)kaddr;
 	bit_pos = dentry - (struct f2fs_dir_entry *)dentry_blk->dentry;
@@ -562,6 +562,8 @@ void f2fs_delete_entry(struct f2fs_dir_entry *dentry, struct page *page,
 	if (inode) {
 		struct f2fs_sb_info *sbi = F2FS_SB(dir->i_sb);
 
+		down_write(&F2FS_I(inode)->i_sem);
+
 		if (S_ISDIR(inode->i_mode)) {
 			drop_nlink(dir);
 			update_inode_page(dir);
@@ -572,6 +574,7 @@ void f2fs_delete_entry(struct f2fs_dir_entry *dentry, struct page *page,
 			drop_nlink(inode);
 			i_size_write(inode, 0);
 		}
+		up_write(&F2FS_I(inode)->i_sem);
 		update_inode_page(inode);
 
 		if (inode->i_nlink == 0)
