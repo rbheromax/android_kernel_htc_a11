@@ -1193,6 +1193,7 @@ static int f2fs_write_node_page(struct page *page,
 redirty_out:
 	dec_page_count(sbi, F2FS_DIRTY_NODES);
 	wbc->pages_skipped++;
+	account_page_redirty(page);
 	set_page_dirty(page);
 	return AOP_WRITEPAGE_ACTIVATE;
 }
@@ -1873,11 +1874,9 @@ void destroy_node_manager(struct f2fs_sb_info *sbi)
 	while ((found = __gang_lookup_nat_cache(nm_i,
 					nid, NATVEC_SIZE, natvec))) {
 		unsigned idx;
-		for (idx = 0; idx < found; idx++) {
-			struct nat_entry *e = natvec[idx];
-			nid = nat_get_nid(e) + 1;
-			__del_from_nat_cache(nm_i, e);
-		}
+		nid = nat_get_nid(natvec[found - 1]) + 1;
+		for (idx = 0; idx < found; idx++)
+			__del_from_nat_cache(nm_i, natvec[idx]);
 	}
 	f2fs_bug_on(nm_i->nat_cnt);
 	write_unlock(&nm_i->nat_tree_lock);
@@ -1890,12 +1889,12 @@ void destroy_node_manager(struct f2fs_sb_info *sbi)
 int __init create_node_manager_caches(void)
 {
 	nat_entry_slab = f2fs_kmem_cache_create("nat_entry",
-			sizeof(struct nat_entry), NULL);
+			sizeof(struct nat_entry));
 	if (!nat_entry_slab)
 		return -ENOMEM;
 
 	free_nid_slab = f2fs_kmem_cache_create("free_nid",
-			sizeof(struct free_nid), NULL);
+			sizeof(struct free_nid));
 	if (!free_nid_slab) {
 		kmem_cache_destroy(nat_entry_slab);
 		return -ENOMEM;

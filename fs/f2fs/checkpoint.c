@@ -82,6 +82,7 @@ inline int get_max_meta_blks(struct f2fs_sb_info *sbi, int type)
 		return NM_I(sbi)->max_nid / NAT_ENTRY_PER_BLOCK;
 	case META_SIT:
 		return SIT_BLK_CNT(sbi);
+	case META_SSA:
 	case META_CP:
 		return 0;
 	default:
@@ -90,7 +91,7 @@ inline int get_max_meta_blks(struct f2fs_sb_info *sbi, int type)
 }
 
 /*
- * Readahead CP/NAT/SIT pages
+ * Readahead CP/NAT/SIT/SSA pages
  */
 int ra_meta_pages(struct f2fs_sb_info *sbi, int start, int nrpages, int type)
 {
@@ -125,8 +126,9 @@ int ra_meta_pages(struct f2fs_sb_info *sbi, int start, int nrpages, int type)
 				goto out;
 			prev_blk_addr = blk_addr;
 			break;
+		case META_SSA:
 		case META_CP:
-			/* get cp block addr */
+			/* get ssa/cp block addr */
 			blk_addr = blkno;
 			break;
 		default:
@@ -176,6 +178,7 @@ no_write:
 redirty_out:
 	dec_page_count(sbi, F2FS_DIRTY_META);
 	wbc->pages_skipped++;
+	account_page_redirty(page);
 	set_page_dirty(page);
 	return AOP_WRITEPAGE_ACTIVATE;
 }
@@ -936,11 +939,11 @@ void init_orphan_info(struct f2fs_sb_info *sbi)
 int __init create_checkpoint_caches(void)
 {
 	orphan_entry_slab = f2fs_kmem_cache_create("f2fs_orphan_entry",
-			sizeof(struct orphan_inode_entry), NULL);
+			sizeof(struct orphan_inode_entry));
 	if (!orphan_entry_slab)
 		return -ENOMEM;
 	inode_entry_slab = f2fs_kmem_cache_create("f2fs_dirty_dir_entry",
-			sizeof(struct dir_inode_entry), NULL);
+			sizeof(struct dir_inode_entry));
 	if (!inode_entry_slab) {
 		kmem_cache_destroy(orphan_entry_slab);
 		return -ENOMEM;
