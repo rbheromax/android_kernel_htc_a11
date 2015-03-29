@@ -22,7 +22,7 @@
 
 #ifdef CONFIG_F2FS_CHECK_FS
 #define f2fs_bug_on(condition)	BUG_ON(condition)
-#define f2fs_down_write(x, y)	down_write_nest_lock(x, y)
+#define f2fs_down_write(x, y)	down_write_nested(x, y)
 #else
 #define f2fs_bug_on(condition)
 #define f2fs_down_write(x, y)	down_write(x)
