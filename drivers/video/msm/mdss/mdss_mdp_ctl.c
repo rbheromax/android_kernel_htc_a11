@@ -22,6 +22,7 @@
 #include "mdss_fb.h"
 #include "mdss_mdp.h"
 #include "mdss_htc_util.h"
+#include "xlog.h"
 
 #define MDSS_MDP_BUS_FACTOR_SHIFT 10
 #define MDSS_MDP_BUS_FUDGE_FACTOR_IB(val) (((val) / 2) * 3)
@@ -1739,10 +1740,33 @@ int mdss_mdp_display_wait4pingpong(struct mdss_mdp_ctl *ctl)
 	if (ctl->wait_pingpong)
 		ret = ctl->wait_pingpong(ctl, NULL);
 
+#ifdef CONFIG_MDSS_DUMP_MDP_UNDERRUN
+	ctl->roi_bkup.w = ctl->roi.w;
+	ctl->roi_bkup.h = ctl->roi.h;
+#endif
+
 	mutex_unlock(&ctl->lock);
 
 	return ret;
 }
+
+#ifdef CONFIG_MDSS_DUMP_MDP_UNDERRUN
+
+static void mdp_print_mixer_reg(struct mdss_mdp_ctl *commit_ctl)
+{
+        int i, off;
+        u32 data[4];
+
+        for (i=0; i < 4; i++) {
+                off =  MDSS_MDP_REG_CTL_LAYER(i);
+                data[i] = mdss_mdp_ctl_read(commit_ctl, off);
+        }
+        XLOG(__func__, data[0], data[1], data[2], data[3], off, 0);
+}
+
+#else
+#define mdp_print_mixer_reg(commit_ctl)
+#endif
 
 int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg)
 {
@@ -1804,10 +1828,9 @@ int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg)
 	mdss_mdp_pp_setup_locked(ctl);
 
 	
-	if ((ctl->mfd) && (ctl->mfd->index == 0)) {
+	if ((ctl->mfd) && (ctl->mfd->index == 0))
 		htc_set_pp_pa(ctl);
-		htc_set_pp_pcc(ctl);
-	}
+
 	mdss_mdp_ctl_write(ctl, MDSS_MDP_REG_CTL_FLUSH, ctl->flush_bits);
 	if (sctl) {
 		mdss_mdp_ctl_write(sctl, MDSS_MDP_REG_CTL_FLUSH,
@@ -1815,6 +1838,8 @@ int mdss_mdp_display_commit(struct mdss_mdp_ctl *ctl, void *arg)
 	}
 	wmb();
 	ctl->flush_bits = 0;
+
+	mdp_print_mixer_reg(ctl);
 
 	if (ctl->display_fnc)
 		ret = ctl->display_fnc(ctl, arg); 

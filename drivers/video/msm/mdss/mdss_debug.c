@@ -24,6 +24,7 @@
 #include "mdss.h"
 #include "mdss_mdp.h"
 #include "mdss_debug.h"
+#include "xlog.h"
 
 #define DEFAULT_BASE_REG_CNT 0x100
 #define GROUP_BYTES 4
@@ -120,6 +121,8 @@ static ssize_t mdss_debug_base_offset_read(struct file *file,
 		return -EFAULT;
 
 	*ppos += len;	
+
+	xlog_dump();
 
 	return len;
 }

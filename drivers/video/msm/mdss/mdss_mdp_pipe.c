@@ -29,6 +29,8 @@ static DEFINE_MUTEX(mdss_mdp_sspp_lock);
 static DEFINE_MUTEX(mdss_mdp_smp_lock);
 
 static int mdss_mdp_pipe_free(struct mdss_mdp_pipe *pipe);
+static int mdss_mdp_smp_mmb_set(int client_id, unsigned long *smp);
+static void mdss_mdp_smp_mmb_free(unsigned long *smp, bool write);
 static struct mdss_mdp_pipe *mdss_mdp_pipe_search_by_client_id(
 	struct mdss_data_type *mdata, int client_id);
 
@@ -57,15 +59,24 @@ static u32 mdss_mdp_smp_mmb_reserve(struct mdss_mdp_pipe_smp_map *smp_map,
 
 	i = bitmap_weight(smp_map->allocated, SMP_MB_CNT);
 
+	/*
+	 * SMP programming is not double buffered. Fail the request,
+	 * that calls for change in smp configuration (addition/removal
+	 * of smp blocks), so that fallback solution happens.
+	 */
 	if (i != 0 && n != i) {
 		pr_debug("Can't change mmb config, num_blks: %d alloc: %d\n",
 			n, i);
 		return 0;
 	}
 
+	/*
+	 * Clear previous SMP reservations and reserve according to the
+	 * latest configuration
+	 */
 	mdss_mdp_smp_mmb_free(smp_map->reserved, false);
 
-	
+	/* Reserve mmb blocks*/
 	for (; i < n; i++) {
 		if (bitmap_full(mdata->mmb_alloc_map, SMP_MB_CNT))
 			break;
@@ -311,9 +322,8 @@ int mdss_mdp_smp_handoff(struct mdss_data_type *mdata)
 		data = MDSS_MDP_REG_READ(MDSS_MDP_REG_SMP_ALLOC_W0 + off);
 		client_id = (data >> s) & 0xFF;
 		if (test_bit(i, mdata->mmb_alloc_map)) {
-			if (pipe)
-				pr_debug("smp mmb %d already assigned to pipe %d (client_id %d)"
-					, i, pipe->num, client_id);
+			pr_debug("smp mmb %d already assigned to pipe %d (client_id %d)"
+				, i, pipe->num, client_id);
 			continue;
 		}
 
@@ -594,12 +604,10 @@ int mdss_mdp_pipe_handoff(struct mdss_mdp_pipe *pipe)
 	}
 	pipe->src_fmt = mdss_mdp_get_format_params(src_fmt);
 
-	if (pipe->src_fmt)
-		pr_debug("Pipe settings: src.h=%d src.w=%d dst.h=%d dst.w=%d bpp=%d\n"
-			, pipe->src.h, pipe->src.w, pipe->dst.h, pipe->dst.w,
-			pipe->src_fmt->bpp);
-	else
-		pr_err("pipe->src_fmt was NULL\n");
+	pr_debug("Pipe settings: src.h=%d src.w=%d dst.h=%d dst.w=%d bpp=%d\n"
+		, pipe->src.h, pipe->src.w, pipe->dst.h, pipe->dst.w,
+		pipe->src_fmt->bpp);
+
 	pipe->is_handed_off = true;
 	atomic_inc(&pipe->ref_cnt);
 
@@ -843,7 +851,7 @@ static int mdss_mdp_src_addr_setup(struct mdss_mdp_pipe *pipe,
 static int mdss_mdp_pipe_solidfill_setup(struct mdss_mdp_pipe *pipe)
 {
 	int ret;
-	u32 secure, format;
+	u32 secure, format, unpack;
 
 	pr_debug("solid fill setup on pnum=%d\n", pipe->num);
 
@@ -856,8 +864,21 @@ static int mdss_mdp_pipe_solidfill_setup(struct mdss_mdp_pipe *pipe)
 	format = MDSS_MDP_FMT_SOLID_FILL;
 	secure = (pipe->flags & MDP_SECURE_OVERLAY_SESSION ? 0xF : 0x0);
 
+	/* support ARGB color format only */
+	unpack = (C3_ALPHA << 24) | (C2_R_Cr << 16) |
+		(C1_B_Cb << 8) | (C0_G_Y << 0);
 	mdss_mdp_pipe_write(pipe, MDSS_MDP_REG_SSPP_SRC_FORMAT, format);
+	mdss_mdp_pipe_write(pipe, MDSS_MDP_REG_SSPP_SRC_CONSTANT_COLOR,
+		pipe->bg_color);
+	mdss_mdp_pipe_write(pipe, MDSS_MDP_REG_SSPP_SRC_UNPACK_PATTERN, unpack);
 	mdss_mdp_pipe_write(pipe, MDSS_MDP_REG_SSPP_SRC_ADDR_SW_STATUS, secure);
+	mdss_mdp_pipe_write(pipe, MDSS_MDP_REG_SSPP_SRC_OP_MODE, 0);
+
+	if (pipe->type != MDSS_MDP_PIPE_TYPE_DMA) {
+		mdss_mdp_pipe_write(pipe, MDSS_MDP_REG_SCALE_CONFIG, 0);
+		if (pipe->type == MDSS_MDP_PIPE_TYPE_VIG)
+			mdss_mdp_pipe_write(pipe, MDSS_MDP_REG_VIG_OP_MODE, 0);
+	}
 
 	return 0;
 }
@@ -889,7 +910,8 @@ int mdss_mdp_pipe_queue_data(struct mdss_mdp_pipe *pipe,
 			 (pipe->mixer->type == MDSS_MDP_MIXER_TYPE_WRITEBACK)
 			 && (ctl->mdata->mixer_switched)) ||
 			 ctl->roi_changed;
-	if (src_data == NULL) {
+	if (src_data == NULL || !pipe->has_buf) {
+		pipe->params_changed = 0;
 		mdss_mdp_pipe_solidfill_setup(pipe);
 		goto update_nobuf;
 	}

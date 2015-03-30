@@ -33,10 +33,6 @@ struct attribute_status htc_mdss_pp_pa[] = {
 	{"mdss_pp_hue", 0, 0, 0},
 };
 
-struct attribute_status htc_mdss_pp_pcc[] = {
-	{"mdss_pp_pcc", 0, 0, 0},
-};
-
 static struct delayed_work dimming_work;
 
 struct msm_fb_data_type *mfd_instance;
@@ -51,7 +47,6 @@ static char *tmp;
 static struct dsi_cmd_desc debug_cmd = {
 	{DTYPE_DCS_LWRITE, 1, 0, 0, 1, 1}, dcs_cmds
 };
-
 static ssize_t dsi_cmd_write(
 	struct file *file,
 	const char __user *buff,
@@ -61,7 +56,6 @@ static ssize_t dsi_cmd_write(
 	u32 type, value;
 	int cnt, i;
 	struct dcs_cmd_req cmdreq;
-	char rbuf[4];
 
 	if (count >= sizeof(debug_buf) || count < MIN_COUNT)
 		return -EFAULT;
@@ -86,8 +80,6 @@ static ssize_t dsi_cmd_write(
 		debug_cmd.dchdr.dtype = DTYPE_DCS_LWRITE;
 	else if (type == DTYPE_GEN_LWRITE)
 		debug_cmd.dchdr.dtype = DTYPE_GEN_LWRITE;
-	else if (type == DTYPE_DCS_READ)
-		debug_cmd.dchdr.dtype = DTYPE_DCS_READ;
 	else
 		return -EFAULT;
 
@@ -106,29 +98,19 @@ static ssize_t dsi_cmd_write(
 	}
 
 	memset(&cmdreq, 0, sizeof(cmdreq));
+	cmdreq.cmds = &debug_cmd;
+	cmdreq.cmds_cnt = 1;
+	cmdreq.flags = CMD_REQ_COMMIT | CMD_CLK_CTRL;
+	cmdreq.rlen = 0;
+	cmdreq.cb = NULL;
 
-	if (type == DTYPE_DCS_READ){
-		cmdreq.cmds = &debug_cmd;
-		cmdreq.cmds_cnt = 1;
-		cmdreq.flags = CMD_REQ_COMMIT | CMD_REQ_RX;
-		cmdreq.rlen = 4;
-		cmdreq.rbuf = rbuf;
-		mdss_dsi_cmdlist_put(ctrl_instance, &cmdreq);
-		PR_DISP_INFO("%s: Read 0x%x = 0x%x, count=%d\n", __func__, dcs_cmds[0], rbuf[0], count);
-	} else {
-		cmdreq.cmds = &debug_cmd;
-		cmdreq.cmds_cnt = 1;
-		cmdreq.flags = CMD_REQ_COMMIT | CMD_CLK_CTRL;
-		cmdreq.rlen = 0;
-		cmdreq.cb = NULL;
-		mdss_dsi_cmdlist_put(ctrl_instance, &cmdreq);
-		PR_DISP_INFO("%s %d\n", __func__, count);
-	}
+	mdss_dsi_cmdlist_put(ctrl_instance, &cmdreq);
+	PR_DISP_INFO("%s %d\n", __func__, count);
 	return count;
 }
 
 static const struct file_operations dsi_cmd_fops = {
-	.write = dsi_cmd_write,
+        .write = dsi_cmd_write,
 };
 
 void htc_debugfs_init(struct msm_fb_data_type *mfd)
@@ -187,156 +169,8 @@ static ssize_t attrs_show(struct device *dev,
 			break;
 		}
 	}
-	for (i = 0 ; i < ARRAY_SIZE(htc_mdss_pp_pcc); i++) {
-		if (strcmp(attr->attr.name, htc_mdss_pp_pcc[i].title) == 0) {
-			sprintf(buf,"%d\n", htc_mdss_pp_pcc[i].cur_value);
-		        ret = strlen(buf) + 1;
-			break;
-		}
-	}
+
 	return ret;
-}
-
-
-#define SLEEPMS_OFFSET(strlen) (strlen+1) 
-#define CMDLEN_OFFSET(strlen)  (SLEEPMS_OFFSET(strlen)+sizeof(const __be32))
-#define CMD_OFFSET(strlen)     (CMDLEN_OFFSET(strlen)+sizeof(const __be32))
-
-static struct __dsi_cmd_map{
-	char *cmdtype_str;
-	int  cmdtype_strlen;
-	int  dtype;
-} dsi_cmd_map[] = {
-	{ "DTYPE_DCS_WRITE", 0, DTYPE_DCS_WRITE },
-	{ "DTYPE_DCS_WRITE1", 0, DTYPE_DCS_WRITE1 },
-	{ "DTYPE_DCS_LWRITE", 0, DTYPE_DCS_LWRITE },
-	{ "DTYPE_GEN_WRITE", 0, DTYPE_GEN_WRITE },
-	{ "DTYPE_GEN_WRITE1", 0, DTYPE_GEN_WRITE1 },
-	{ "DTYPE_GEN_WRITE2", 0, DTYPE_GEN_WRITE2 },
-	{ "DTYPE_GEN_LWRITE", 0, DTYPE_GEN_LWRITE },
-	{ NULL, 0, 0 }
-};
-
-int htc_mdss_dsi_parse_dcs_cmds(struct device_node *np,
-		struct dsi_panel_cmds *pcmds, char *cmd_key, char *link_key)
-{
-	const char *data;
-	int blen = 0, len = 0;
-	char *buf;
-	struct property *prop;
-	struct dsi_ctrl_hdr *pdchdr;
-	int i, cnt;
-	int curcmdtype;
-
-	i = 0;
-	while(dsi_cmd_map[i].cmdtype_str){
-		if(!dsi_cmd_map[i].cmdtype_strlen){
-			dsi_cmd_map[i].cmdtype_strlen = strlen(dsi_cmd_map[i].cmdtype_str);
-			pr_err("%s: parsing, key=%s/%d  [%d]\n", __func__,
-				dsi_cmd_map[i].cmdtype_str, dsi_cmd_map[i].cmdtype_strlen, dsi_cmd_map[i].dtype );
-		}
-		i++;
-	}
-
-	prop = of_find_property( np, cmd_key, &len);
-	if (!prop || !len || !(prop->length) || !(prop->value)) {
-		pr_err("%s: failed, key=%s  [%d : %d : %p]\n", __func__, cmd_key,
-			len, (prop ? prop->length : -1), (prop ? prop->value : 0) );
-		
-		return -ENOMEM;
-	}
-
-	data = prop->value;
-	blen = 0;
-	cnt = 0;
-	while(len > 0){
-		curcmdtype = 0;
-		while(dsi_cmd_map[curcmdtype].cmdtype_strlen){
-			if( !strncmp( data,
-						  dsi_cmd_map[curcmdtype].cmdtype_str,
-						  dsi_cmd_map[curcmdtype].cmdtype_strlen ) &&
-				data[dsi_cmd_map[curcmdtype].cmdtype_strlen] == '\0' )
-				break;
-			curcmdtype++;
-		};
-		if( !dsi_cmd_map[curcmdtype].cmdtype_strlen ) 
-			break;
-
-		i = be32_to_cpup((__be32 *)&data[CMDLEN_OFFSET(dsi_cmd_map[curcmdtype].cmdtype_strlen)]);
-		blen += i;
-		cnt++;
-
-		data = data + CMD_OFFSET(dsi_cmd_map[curcmdtype].cmdtype_strlen) + i;
-		len = len - CMD_OFFSET(dsi_cmd_map[curcmdtype].cmdtype_strlen) - i;
-	}
-
-	if(len || !cnt || !blen){
-		pr_err("%s: failed, key[%s] : %d cmds, remain=%d bytes \n", __func__, cmd_key, cnt, len);
-		return -ENOMEM;
-	}
-
-	i = (sizeof(char)*blen+sizeof(struct dsi_ctrl_hdr)*cnt);
-	buf = kzalloc( i, GFP_KERNEL);
-	if (!buf){
-		pr_err("%s: create dsi ctrl oom failed \n", __func__);
-		return -ENOMEM;
-	}
-
-	pcmds->cmds = kzalloc(cnt * sizeof(struct dsi_cmd_desc), GFP_KERNEL);
-	if (!pcmds->cmds){
-		pr_err("%s: create dsi commands oom failed \n", __func__);
-		goto exit_free;
-	}
-
-	pcmds->cmd_cnt = cnt;
-	pcmds->buf = buf;
-	pcmds->blen = i;
-	data = prop->value;
-	for(i=0; i<cnt; i++){
-		pdchdr = &pcmds->cmds[i].dchdr;
-
-		curcmdtype = 0;
-		while(dsi_cmd_map[curcmdtype].cmdtype_strlen){
-			if( !strncmp( data,
-						 dsi_cmd_map[curcmdtype].cmdtype_str,
-						 dsi_cmd_map[curcmdtype].cmdtype_strlen ) &&
-				data[dsi_cmd_map[curcmdtype].cmdtype_strlen] == '\0' ){
-				pdchdr->dtype = dsi_cmd_map[curcmdtype].dtype;
-				break;
-			}
-			curcmdtype ++;
-		}
-
-		pdchdr->last = 0x01;
-		pdchdr->vc = 0x00;
-		pdchdr->ack = 0x00;
-		pdchdr->wait = be32_to_cpup((__be32 *)&data[SLEEPMS_OFFSET(dsi_cmd_map[curcmdtype].cmdtype_strlen)]) & 0xff;
-		pdchdr->dlen = be32_to_cpup((__be32 *)&data[CMDLEN_OFFSET(dsi_cmd_map[curcmdtype].cmdtype_strlen)]);
-		memcpy( buf, pdchdr, sizeof(struct dsi_ctrl_hdr) );
-		buf += sizeof(struct dsi_ctrl_hdr);
-		memcpy( buf, &data[CMD_OFFSET(dsi_cmd_map[curcmdtype].cmdtype_strlen)], pdchdr->dlen);
-		pcmds->cmds[i].payload = buf;
-		buf += pdchdr->dlen;
-		data = data + CMD_OFFSET(dsi_cmd_map[curcmdtype].cmdtype_strlen) + pdchdr->dlen;
-	}
-
-	data = of_get_property(np, link_key, NULL);
-	if (data) {
-		if (!strncmp(data, "dsi_hs_mode", 11))
-			pcmds->link_state = DSI_HS_MODE;
-		else
-			pcmds->link_state = DSI_LP_MODE;
-	} else {
-		pcmds->link_state = DSI_HS_MODE;
-	}
-	pr_debug("%s: dcs_cmd=%x len=%d, cmd_cnt=%d link_state=%d\n", __func__,
-		pcmds->buf[0], pcmds->blen, pcmds->cmd_cnt, pcmds->link_state);
-
-	return 0;
-
-exit_free:
-	kfree(buf);
-	return -ENOMEM;
 }
 
 static ssize_t attr_store(struct device *dev, struct device_attribute *attr,
@@ -364,12 +198,7 @@ static ssize_t attr_store(struct device *dev, struct device_attribute *attr,
 			break;
 		}
 	}
-	for (i = 0 ; i < ARRAY_SIZE(htc_mdss_pp_pcc); i++) {
-		if (strcmp(attr->attr.name, htc_mdss_pp_pcc[i].title) == 0) {
-			htc_mdss_pp_pcc[i].req_value = res;
-			break;
-		}
-	}
+
 err_out:
 	return count;
 }
@@ -377,12 +206,10 @@ err_out:
 static DEVICE_ATTR(backlight_info, S_IRUGO, camera_bl_show, NULL);
 static DEVICE_ATTR(cabc_level_ctl, S_IRUGO | S_IWUSR, attrs_show, attr_store);
 static DEVICE_ATTR(mdss_pp_hue, S_IRUGO | S_IWUSR, attrs_show, attr_store);
-static DEVICE_ATTR(mdss_pp_pcc, S_IRUGO | S_IWUSR, attrs_show, attr_store);
 static struct attribute *htc_extend_attrs[] = {
 	&dev_attr_backlight_info.attr,
 	&dev_attr_cabc_level_ctl.attr,
 	&dev_attr_mdss_pp_hue.attr,
-	&dev_attr_mdss_pp_pcc.attr,
 	NULL,
 };
 
@@ -402,9 +229,6 @@ void htc_register_attrs(struct kobject *led_kobj, struct msm_fb_data_type *mfd)
 	
 	htc_mdss_pp_pa[HUE_INDEX].req_value = panel_info->mdss_pp_hue;
 
-	
-	htc_mdss_pp_pcc[HUE_INDEX].req_value = 0;
-
 	return;
 }
 
@@ -418,9 +242,7 @@ void htc_reset_status(void)
 	for (i = 0 ; i < ARRAY_SIZE(htc_mdss_pp_pa); i++) {
 		htc_mdss_pp_pa[i].cur_value = htc_mdss_pp_pa[i].def_value;
 	}
-	for (i = 0 ; i < ARRAY_SIZE(htc_mdss_pp_pcc); i++) {
-		htc_mdss_pp_pcc[i].cur_value = htc_mdss_pp_pcc[i].def_value;
-	}
+
 
 	
 	cancel_delayed_work_sync(&dimming_work);
@@ -445,7 +267,7 @@ void htc_set_cabc(struct msm_fb_data_type *mfd)
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 					panel_data);
 
-	if (htc_attr_status[CABC_INDEX].req_value > 2)
+	if ((htc_attr_status[CABC_INDEX].req_value > 2) || (htc_attr_status[CABC_INDEX].req_value < 0))
 		return;
 
 	if (!ctrl_pdata->cabc_off_cmds.cmds)
@@ -532,7 +354,6 @@ void htc_dimming_on(struct msm_fb_data_type *mfd)
 }
 
 #define HUE_MAX   4096
-#define PCC_MAX   2
 void htc_set_pp_pa(struct mdss_mdp_ctl *ctl)
 {
 	struct mdss_data_type *mdata;
@@ -568,82 +389,4 @@ void htc_set_pp_pa(struct mdss_mdp_ctl *ctl)
 
 	htc_mdss_pp_pa[HUE_INDEX].cur_value = htc_mdss_pp_pa[HUE_INDEX].req_value;
 	PR_DISP_INFO("%s pp_hue = 0x%x\n", __func__, htc_mdss_pp_pa[HUE_INDEX].req_value);
-}
-
-void htc_set_pp_pcc(struct mdss_mdp_ctl *ctl)
-{
-	struct mdss_data_type *mdata;
-	struct mdss_mdp_mixer *mixer;
-	u32 base = 0, opmode;
-	char __iomem *basel;
-
-	
-	if (htc_mdss_pp_pcc[HUE_INDEX].req_value == htc_mdss_pp_pcc[HUE_INDEX].cur_value)
-		return;
-
-	if (htc_mdss_pp_pcc[HUE_INDEX].req_value >= PCC_MAX)
-		return;
-
-	mdata = mdss_mdp_get_mdata();
-	mixer = mdata->mixer_intf;
-
-	base = MDSS_MDP_REG_DSPP_OFFSET(0);
-	basel = mixer->dspp_base;
-
-	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_ON, false);
-
-	MDSS_MDP_REG_WRITE(base + 0x30, 0x00007ff8);
-	MDSS_MDP_REG_WRITE(base + 0x34, 0x00007ff8);
-	MDSS_MDP_REG_WRITE(base + 0x38, 0x00007ff8);
-	MDSS_MDP_REG_WRITE(base + 0x40, 0x00018000);
-	MDSS_MDP_REG_WRITE(base + 0x44, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0x48, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0x50, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0x54, 0x00018000);
-	MDSS_MDP_REG_WRITE(base + 0x58, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0x60, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0x64, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0x68, 0x00018000);
-	MDSS_MDP_REG_WRITE(base + 0x70, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0x74, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0x78, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0x80, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0x84, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0x88, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0x90, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0x94, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0x98, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0xa0, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0xa4, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0xa8, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0xb0, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0xb4, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0xb8, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0xc0, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0xc4, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0xc8, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0xd0, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0xd4, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0xd8, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0xe0, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0xe4, 0x00000000);
-	MDSS_MDP_REG_WRITE(base + 0xe8, 0x00000000);
-
-
-	MDSS_MDP_REG_WRITE(base + MDSS_MDP_REG_DSPP_PA_BASE, htc_mdss_pp_pa[HUE_INDEX].req_value);
-
-	opmode = MDSS_MDP_REG_READ(base);
-	if(htc_mdss_pp_pcc[HUE_INDEX].req_value)
-		opmode |= (1 << 4); 
-	else
-		opmode &= ~(1 << 4); 
-	writel_relaxed(opmode, basel + MDSS_MDP_REG_DSPP_OP_MODE);
-
-	ctl->flush_bits |= BIT(13);
-
-	wmb();
-	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF, false);
-
-	htc_mdss_pp_pcc[HUE_INDEX].cur_value = htc_mdss_pp_pcc[HUE_INDEX].req_value;
-	PR_DISP_INFO("%s pp_pcc = 0x%x\n", __func__, htc_mdss_pp_pcc[HUE_INDEX].req_value);
 }

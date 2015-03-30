@@ -61,3 +61,12 @@ config MHL_MONITOR_WORKAROUND
 	Support the MHL function in some monitor.
 	Som monitor can't full support HDMI spec.
 	Workaound for this kind of issue
+
+config MDSS_DUMP_MDP_UNDERRUN
+	boolean 'Dump reg when MDP underrun'
+	default n:
+
+config LCD_KCAL
+	depends on FB_MSM_MDSS
+	bool "Enable sysfs for LCD KCAL"
+	default n

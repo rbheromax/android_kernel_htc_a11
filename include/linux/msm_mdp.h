@@ -79,6 +79,8 @@
 #define MSMFB_WRITEBACK_SET_MIRRORING_HINT _IOW(MSMFB_IOCTL_MAGIC, 167, \
 						unsigned int)
 #define MSMFB_ASYNC_BLIT              _IOW(MSMFB_IOCTL_MAGIC, 168, unsigned int)
+#define MSMFB_OVERLAY_PREPARE		_IOWR(MSMFB_IOCTL_MAGIC, 169, \
+						struct mdp_overlay_list)
 
 #define MSMFB_GET_USB_PROJECTOR_INFO _IOR(MSMFB_IOCTL_MAGIC, 301, struct msmfb_usb_projector_info)
 #define MSMFB_SET_USB_PROJECTOR_INFO _IOW(MSMFB_IOCTL_MAGIC, 302, struct msmfb_usb_projector_info)
@@ -103,6 +105,7 @@ enum {
 	NOTIFY_TYPE_NO_UPDATE,
 	NOTIFY_TYPE_SUSPEND,
 	NOTIFY_TYPE_UPDATE,
+	NOTIFY_TYPE_BL_UPDATE,
 };
 
 enum {
@@ -204,9 +207,6 @@ enum {
 #define MDP_DECIMATION_EN		0x00000800
 #define MDP_TRANSP_NOP 0xffffffff
 #define MDP_ALPHA_NOP 0xff
-
-#define PANEL_PARTIAL_UPDATE_ENABLED	0x1
-#define PANEL_EVEN_ROI_UPDATE		0x2
 
 #define MDP_FB_PAGE_PROTECTION_NONCACHED         (0)
 #define MDP_FB_PAGE_PROTECTION_WRITECOMBINE      (1)
@@ -453,6 +453,68 @@ enum mdss_mdp_blend_op {
 	BLEND_OP_MAX,
 };
 
+/**
+ * enum mdp_overlay_pipe_type - Different pipe type set by userspace
+ *
+ * @PIPE_TYPE_AUTO:    Not specified, pipe will be selected according to flags.
+ * @PIPE_TYPE_VIG:     VIG pipe.
+ * @PIPE_TYPE_RGB:     RGB pipe.
+ * @PIPE_TYPE_DMA:     DMA pipe.
+ * @PIPE_TYPE_MAX:     Used to track maximum number of pipe type.
+ */
+enum mdp_overlay_pipe_type {
+        PIPE_TYPE_AUTO = 0,
+        PIPE_TYPE_VIG,
+        PIPE_TYPE_RGB,
+        PIPE_TYPE_DMA,
+        PIPE_TYPE_MAX,
+};
+
+/**
+ * struct mdp_overlay - overlay surface structure
+ * @src:	Source image information (width, height, format).
+ * @src_rect:	Source crop rectangle, portion of image that will be fetched.
+ *		This should always be within boundaries of source image.
+ * @dst_rect:	Destination rectangle, the position and size of image on screen.
+ *		This should always be within panel boundaries.
+ * @z_order:	Blending stage to occupy in display, if multiple layers are
+ *		present, highest z_order usually means the top most visible
+ *		layer. The range acceptable is from 0-3 to support blending
+ *		up to 4 layers.
+ * @is_fg:	This flag is used to disable blending of any layers with z_order
+ *		less than this overlay. It means that any layers with z_order
+ *		less than this layer will not be blended and will be replaced
+ *		by the background border color.
+ * @alpha:	Used to set plane opacity. The range can be from 0-255, where
+ *		0 means completely transparent and 255 means fully opaque.
+ * @transp_mask: Color used as color key for transparency. Any pixel in fetched
+ *		image matching this color will be transparent when blending.
+ *		The color should be in same format as the source image format.
+ * @flags:	This is used to customize operation of overlay. See MDP flags
+ *		for more information.
+ * @pipe_type:  Used to specify the type of overlay pipe.
+ * @user_data:	DEPRECATED* Used to store user application specific information.
+ * @bg_color:	Solid color used to fill the overlay surface when no source
+ *		buffer is provided.
+ * @horz_deci:	Horizontal decimation value, this indicates the amount of pixels
+ *		dropped for each pixel that is fetched from a line. The value
+ *		given should be power of two of decimation amount.
+ *		0: no decimation
+ *		1: decimate by 2 (drop 1 pixel for each pixel fetched)
+ *		2: decimate by 4 (drop 3 pixels for each pixel fetched)
+ *		3: decimate by 8 (drop 7 pixels for each pixel fetched)
+ *		4: decimate by 16 (drop 15 pixels for each pixel fetched)
+ * @vert_deci:	Vertical decimation value, this indicates the amount of lines
+ *		dropped for each line that is fetched from overlay. The value
+ *		given should be power of two of decimation amount.
+ *		0: no decimation
+ *		1: decimation by 2 (drop 1 line for each line fetched)
+ *		2: decimation by 4 (drop 3 lines for each line fetched)
+ *		3: decimation by 8 (drop 7 lines for each line fetched)
+ *		4: decimation by 16 (drop 15 lines for each line fetched)
+ * @overlay_pp_cfg: Overlay post processing configuration, for more information
+ *		see struct mdp_overlay_pp_params.
+ */
 struct mdp_overlay {
 	struct msmfb_img src;
 	struct mdp_rect src_rect;
@@ -463,8 +525,10 @@ struct mdp_overlay {
 	uint32_t blend_op;
 	uint32_t transp_mask;
 	uint32_t flags;
+	uint32_t pipe_type;
 	uint32_t id;
-	uint32_t user_data[7];
+	uint32_t user_data[6];
+	uint32_t bg_color;
 	uint8_t horz_deci;
 	uint8_t vert_deci;
 	struct mdp_overlay_pp_params overlay_pp_cfg;
@@ -793,6 +857,7 @@ enum {
 	metadata_op_frame_rate,
 	metadata_op_vic,
 	metadata_op_wb_format,
+	metadata_op_wb_secure,
 	metadata_op_get_caps,
 	metadata_op_crc,
 	metadata_op_max
@@ -813,7 +878,6 @@ struct mdss_hw_caps {
 	uint8_t vig_pipes;
 	uint8_t dma_pipes;
 	uint32_t features;
-	uint8_t partial_update;
 };
 
 struct msmfb_metadata {
@@ -826,11 +890,13 @@ struct msmfb_metadata {
 		uint32_t panel_frame_rate;
 		uint32_t video_info_code;
 		struct mdss_hw_caps caps;
+		uint8_t secure_en;
 	} data;
 };
 
 #define MDP_MAX_FENCE_FD	32
 #define MDP_BUF_SYNC_FLAG_WAIT	1
+#define MDP_BUF_SYNC_FLAG_RETIRE_FENCE	0x10
 
 struct mdp_buf_sync {
 	uint32_t flags;
@@ -838,6 +904,7 @@ struct mdp_buf_sync {
 	uint32_t session_id;
 	int *acq_fen_fd;
 	int *rel_fen_fd;
+	int *retire_fen_fd;
 };
 
 struct mdp_async_blit_req_list {
@@ -847,20 +914,30 @@ struct mdp_async_blit_req_list {
 };
 
 #define MDP_DISPLAY_COMMIT_OVERLAY	1
-struct mdp_buf_fence {
-	uint32_t flags;
-	uint32_t acq_fen_fd_cnt;
-	int acq_fen_fd[MDP_MAX_FENCE_FD];
-	int rel_fen_fd[MDP_MAX_FENCE_FD];
-};
-
 
 struct mdp_display_commit {
 	uint32_t flags;
 	uint32_t wait_for_finish;
 	struct fb_var_screeninfo var;
-	struct mdp_buf_fence buf_fence;
 	struct mdp_rect roi;
+};
+
+/**
+* struct mdp_overlay_list - argument for ioctl MSMFB_OVERLAY_PREPARE
+* @num_overlays:	Number of overlay layers as part of the frame.
+* @overlay_list:	Pointer to a list of overlay structures identifying
+*			the layers as part of the frame
+* @flags:		Flags can be used to extend behavior.
+* @processed_overlays:	Output parameter indicating how many pipes were
+*			successful. If there are no errors this number should
+*			match num_overlays. Otherwise it will indicate the last
+*			successful index for overlay that couldn't be set.
+*/
+struct mdp_overlay_list {
+	uint32_t num_overlays;
+	struct mdp_overlay **overlay_list;
+	uint32_t flags;
+	uint32_t processed_overlays;
 };
 
 struct mdp_page_protection {

@@ -26,10 +26,6 @@
 #include <mach/debug_display.h>
 #include <linux/msm_mdp.h>
 
-#ifdef CONFIG_POWERSUSPEND
-#include <linux/powersuspend.h>
-#endif
-
 #define DT_CMD_HDR 6
 #define WLED_MAX_LEVEL	4095
 
@@ -150,8 +146,6 @@ static void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
 
 #define BRI_SETTING_MIN                 30
 #define BRI_SETTING_DEF                 142
-#define BRI_SETTING_HIGH		200
-#define BRI_SETTING_EXTRA		230
 #define BRI_SETTING_MAX                 255
 static unsigned char shrink_pwm(int val, int pwm_min, int pwm_default, int pwm_max)
 {
@@ -182,33 +176,6 @@ static unsigned char linear_pwm(int val, int max_brt, int bl_max)
 
 	PR_DISP_INFO("%s:brightness=%d, bl_pwm=%d\n", __func__,val, bl_pwm);
 	return bl_pwm;
-}
-
-
-static unsigned int bl_to_brightness(int val, int brt_dim, int brt_min, int brt_def, int brt_high, int brt_extra, int brt_max)
-{
-        unsigned int  brt_val;
-
-        if (val <= 0) {
-                brt_val = 0;
-        } else if (val > 0 && (val < BRI_SETTING_MIN)) {
-                brt_val = brt_dim;
-        } else if ((val >= BRI_SETTING_MIN) && (val <= BRI_SETTING_DEF)) {
-                brt_val = (val - BRI_SETTING_MIN) * (brt_def - brt_min) /
-                (BRI_SETTING_DEF - BRI_SETTING_MIN) + brt_min;
-        } else if (val > BRI_SETTING_DEF && val <= BRI_SETTING_HIGH) {
-                brt_val = (val - BRI_SETTING_DEF) * (brt_high - brt_def) /
-                (BRI_SETTING_HIGH - BRI_SETTING_DEF) + brt_def;
-        } else if (val > BRI_SETTING_HIGH && val <= BRI_SETTING_EXTRA) {
-                brt_val = (val - BRI_SETTING_HIGH) * (brt_extra - brt_high) /
-                (BRI_SETTING_EXTRA - BRI_SETTING_HIGH) + brt_high;
-        } else if (val > BRI_SETTING_EXTRA && val <= BRI_SETTING_MAX) {
-                brt_val = (val - BRI_SETTING_EXTRA) * (brt_max - brt_extra) /
-                (BRI_SETTING_MAX - BRI_SETTING_EXTRA) + brt_extra;
-        } else if (val > BRI_SETTING_MAX)
-                brt_val = brt_max;
-	PR_DISP_INFO("%s:level=%d, brightness=%d", __func__,val, brt_val);
-	return brt_val;
 }
 
 static char led_pwm1[3] = {0x51, 0x0, 0x0};	
@@ -396,13 +363,6 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 		mdss_dsi_panel_bklt_dcs(ctrl_pdata, bl_level);
 		break;
 	case BL_I2C:
-		if (!ctrl_pdata->panel_data.panel_info.act_brt)
-			bl_level = bl_to_brightness(bl_level, ctrl_pdata->brt_dim,
-								ctrl_pdata->brt_min,
-								ctrl_pdata->brt_def,
-								ctrl_pdata->brt_high,
-								ctrl_pdata->brt_extra,
-								ctrl_pdata->brt_max);
 		led_trigger_event(bl_led_i2c_trigger, bl_level);
 		break;
 
@@ -436,10 +396,6 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 		return -EINVAL;
 	}
 
-#ifdef CONFIG_POWERSUSPEND
-	set_power_suspend_state_pannel_hook(POWER_SUSPEND_INACTIVE);
-#endif
-
 	ctrl = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
 	mipi  = &pdata->panel_info.mipi;
@@ -456,7 +412,7 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	if (ctrl->pwm_ctl_type == PWM_PMIC)
 		led_trigger_event(bl_led_trigger, WLED_MAX_LEVEL);
 	else if (ctrl->pwm_ctl_type == PWM_EXT)
-		mdss_dsi_panel_bklt_dcs(ctrl, pdata->panel_info.max_brt);
+		mdss_dsi_panel_bklt_dcs(ctrl, BRI_SETTING_MAX);
 
 	PR_DISP_INFO("%s:-\n", __func__);
 	return 0;
@@ -487,14 +443,8 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 
 	if (ctrl->pwm_ctl_type == PWM_PMIC)
 		led_trigger_event(bl_led_trigger, 0);
-	else if (ctrl->pwm_ctl_type == PWM_EXT)
-		led_trigger_event(bl_led_i2c_trigger, 0); 
 
 	PR_DISP_INFO("%s:-\n", __func__);
-#ifdef CONFIG_POWERSUSPEND
-	set_power_suspend_state_pannel_hook(POWER_SUSPEND_ACTIVE);
-#endif
-
 	return 0;
 }
 
@@ -738,13 +688,11 @@ static int mdss_dsi_parse_reset_seq(struct device_node *np,
 	return 0;
 }
 
-extern int htc_mdss_dsi_parse_dcs_cmds(struct device_node *np,
-		struct dsi_panel_cmds *pcmds, char *cmd_key, char *link_key);
 
 static int mdss_panel_parse_dt(struct device_node *np,
 			struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 {
-	u32 tmp, res[6];
+	u32 tmp, res[3];
 	int rc, i, len;
 	const char *data;
 	static const char *pdest;
@@ -1000,26 +948,14 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	mdss_dsi_parse_reset_seq(np, pinfo->rst_seq, &(pinfo->rst_seq_len),
 		"qcom,mdss-dsi-reset-sequence");
 
-	htc_mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->on_cmds,
-		"htc-fmt,mdss-dsi-on-command", "qcom,mdss-dsi-on-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->on_cmds,
+		"qcom,mdss-dsi-on-command", "qcom,mdss-dsi-on-command-state");
 
-	htc_mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->off_cmds,
-		"htc-fmt,mdss-dsi-off-command", "qcom,mdss-dsi-off-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->off_cmds,
+		"qcom,mdss-dsi-off-command", "qcom,mdss-dsi-off-command-state");
 
-	htc_mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->display_on_cmds,
-		"htc-fmt,display-on-cmds", "qcom,mdss-dsi-default-command-state");
-
-	if(!ctrl_pdata->on_cmds.cmd_cnt || !ctrl_pdata->on_cmds.blen)
-		mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->on_cmds,
-			"qcom,mdss-dsi-on-command", "qcom,mdss-dsi-on-command-state");
-
-	if(!ctrl_pdata->off_cmds.cmd_cnt || !ctrl_pdata->off_cmds.blen)
-		mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->off_cmds,
-			"qcom,mdss-dsi-off-command", "qcom,mdss-dsi-off-command-state");
-
-	if(!ctrl_pdata->display_on_cmds.cmd_cnt || !ctrl_pdata->display_on_cmds.blen)
-		mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->display_on_cmds,
-			"qcom,display-on-cmds", "qcom,mdss-dsi-default-command-state"); 
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->display_on_cmds,
+		"qcom,display-on-cmds", "qcom,mdss-dsi-default-command-state"); 
 
 	rc = of_property_read_u32(np, "qcom,display-on-wait", &tmp);
 	ctrl_pdata->display_on_wait = (!rc ? tmp : 0);
@@ -1046,33 +982,17 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	rc = of_property_read_u32(np, "htc,mdss-camera-dua-blk", &tmp);
 	pinfo->camera_dua_blk = (!rc ? tmp : pinfo->camera_blk);
 
-	htc_mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->cabc_off_cmds,
-		"htc-fmt,cabc-off-cmds", "qcom,mdss-dsi-default-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->cabc_off_cmds,
+		"htc,cabc-off-cmds", "qcom,mdss-dsi-default-command-state");
 
-	htc_mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->cabc_ui_cmds,
-		"htc-fmt,cabc-ui-cmds", "qcom,mdss-dsi-default-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->cabc_ui_cmds,
+		"htc,cabc-ui-cmds", "qcom,mdss-dsi-default-command-state");
 
-	htc_mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->cabc_video_cmds,
-		"htc-fmt,cabc-video-cmds", "qcom,mdss-dsi-default-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->cabc_video_cmds,
+		"htc,cabc-video-cmds", "qcom,mdss-dsi-default-command-state");
 
-	htc_mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->dimming_on_cmds,
-		"htc-fmt,dimming-on-cmds", "qcom,mdss-dsi-default-command-state");
-
-	if(!ctrl_pdata->cabc_off_cmds.cmd_cnt || !ctrl_pdata->cabc_off_cmds.blen)
-		mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->cabc_off_cmds,
-			"htc,cabc-off-cmds", "qcom,mdss-dsi-default-command-state");
-
-	if(!ctrl_pdata->cabc_ui_cmds.cmd_cnt || !ctrl_pdata->cabc_ui_cmds.blen)
-		mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->cabc_ui_cmds,
-			"htc,cabc-ui-cmds", "qcom,mdss-dsi-default-command-state");
-
-	if(!ctrl_pdata->cabc_video_cmds.cmd_cnt || !ctrl_pdata->cabc_video_cmds.blen)
-		mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->cabc_video_cmds,
-			"htc,cabc-video-cmds", "qcom,mdss-dsi-default-command-state");
-
-	if(!ctrl_pdata->dimming_on_cmds.cmd_cnt || !ctrl_pdata->dimming_on_cmds.blen)
-		mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->dimming_on_cmds,
-			"htc,dimming-on-cmds", "qcom,mdss-dsi-default-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->dimming_on_cmds,
+		"htc,dimming-on-cmds", "qcom,mdss-dsi-default-command-state");
 
 	rc = of_property_read_u32(np, "htc,panel-id", &tmp);
 	pinfo->panel_id = (!rc ? tmp : 0);
@@ -1091,20 +1011,7 @@ static int mdss_panel_parse_dt(struct device_node *np,
 
 	rc = of_property_read_u32(np, "htc,mdss-max-brt-level", &tmp);
 	pinfo->act_max_brt = (!rc ? tmp : MDSS_MAX_BL_BRIGHTNESS);
-	pinfo->max_brt = MDSS_MAX_BL_BRIGHTNESS;
-
-	rc = of_property_read_u32_array(np, "htc,mdss-bl-brt", res, 6);
-	if (rc) {
-		pr_err("%s:%d, mdss-bl-brt not specified\n",
-						 __func__, __LINE__);
-	}
-	ctrl_pdata->brt_dim  = (!rc ? res[0] : BRI_SETTING_MIN);
-	ctrl_pdata->brt_min  = (!rc ? res[1] : BRI_SETTING_MIN);
-	ctrl_pdata->brt_def = (!rc ? res[2] : BRI_SETTING_DEF);
-	ctrl_pdata->brt_high = (!rc ? res[3] : BRI_SETTING_HIGH);
-	ctrl_pdata->brt_extra = (!rc ? res[4] : BRI_SETTING_EXTRA);
-	ctrl_pdata->brt_max = (!rc ? res[5] : BRI_SETTING_MAX);
-
+	pinfo->max_brt = pinfo->act_max_brt;
 
 #ifdef CONFIG_HTC_POWER_HACK
 	rc = of_property_read_u32_array(np, "qcom,mdss-shrink-pwm-power-hack", res, 3);
@@ -1125,25 +1032,12 @@ static int mdss_panel_parse_dt(struct device_node *np,
 		pinfo->camera_blk = tmp;
 	}
 
-	rc = of_property_read_u32(np, "qcom,mdss-dsi-panel-framerate-power-hack", &tmp);
-	if (rc) {
-		pr_err("%s:%d, qcom,mdss-dsi-panel-framerate-power-hack not specified\n",
-						__func__, __LINE__);
-	} else {
-		if (tmp)
-			pinfo->mipi.frame_rate = tmp;
-	}
-
 	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->cabc_ui_cmds,
 		"htc,cabc-ui-cmds-power-hack", "qcom,mdss-dsi-default-command-state");
 
 	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->cabc_video_cmds,
 		"htc,cabc-video-cmds-power-hack", "qcom,mdss-dsi-default-command-state");
 #endif
-
-	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->frame_suffix_cmds,
-		"htc,frame-suffix-cmds", "qcom,mdss-dsi-default-command-state");
-
 	return 0;
 
 error:
@@ -1158,10 +1052,6 @@ int mdss_dsi_panel_init(struct device_node *node,
 	static const char *panel_name;
 	bool cont_splash_enabled;
 	bool partial_update_enabled;
-	bool even_roi = 0;
-#ifdef CONFIG_HTC_POWER_HACK
-	u32 tmp;
-#endif
 
 	if (!node) {
 		pr_err("%s: no panel node\n", __func__);
@@ -1188,19 +1078,6 @@ int mdss_dsi_panel_init(struct device_node *node,
 		ctrl_pdata->panel_data.panel_info.first_power_on = !cont_splash_enabled;
 	} else
 		cont_splash_enabled = false;
-
-#ifdef CONFIG_HTC_POWER_HACK
-	
-	rc = of_property_read_u32(node, "qcom,cont-splash-power-hack", &tmp);
-	if (rc) {
-		pr_err("%s:%d, qcom,cont-splash-power-hack not specified\n",
-						__func__, __LINE__);
-	} else {
-		cont_splash_enabled = tmp ? true : false;
-		ctrl_pdata->panel_data.panel_info.first_power_on = !cont_splash_enabled;
-	}
-#endif
-
 	if (!cont_splash_enabled) {
 		pr_info("%s:%d Continuous splash flag not found.\n",
 				__func__, __LINE__);
@@ -1222,15 +1099,6 @@ int mdss_dsi_panel_init(struct device_node *node,
 		pr_info("%s:%d Partial update disabled.\n", __func__, __LINE__);
 		ctrl_pdata->panel_data.panel_info.partial_update_enabled = 0;
 		ctrl_pdata->partial_update_fnc = NULL;
-	}
-
-	even_roi = of_property_read_bool(node,
-						"qcom,mdss-even-coordinate-update");
-	if (even_roi) {
-		pr_info("%s:%d Even Coordinate Partial update enabled.\n", __func__, __LINE__);
-		ctrl_pdata->panel_data.panel_info.even_roi = 1;
-	} else {
-		ctrl_pdata->panel_data.panel_info.even_roi = 0;
 	}
 
 	ctrl_pdata->on = mdss_dsi_panel_on;
