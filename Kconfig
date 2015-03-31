@@ -15,3 +15,9 @@ config NO_ERROR_ON_MISMATCH
 	default n
 	help
 	   Fix compile for some targets
+
+config LTO
+	bool "Link time optimizations"
+	default n
+	help
+	   foobar
