@@ -330,9 +330,15 @@ include $(srctree)/scripts/Kbuild.include
 
 AS		= $(CROSS_COMPILE)as
 LD		= $(CROSS_COMPILE)ld
-CC		= ccache $(CROSS_COMPILE)gcc
+CC		= ccache $(CROSS_COMPILE)gcc -lto
 CPP		= $(CC) -E
-AR		= $(CROSS_COMPILE)ar
+
+ifdef CONFIG_LTO
+AR	= $(CROSS_COMPILE)gcc-ar
+else
+AR	= $(CROSS_COMPILE)ar
+endif
+
 NM		= $(CROSS_COMPILE)nm
 STRIP		= $(CROSS_COMPILE)strip
 OBJCOPY		= $(CROSS_COMPILE)objcopy
