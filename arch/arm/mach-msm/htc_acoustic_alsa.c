@@ -172,7 +172,9 @@ void htc_acoustic_register_hs_notify(enum HS_NOTIFY_TYPE type, struct hs_notify_
 
 void htc_acoustic_register_ops(struct acoustic_ops *ops)
 {
+#ifdef CONFIG_HTC_DEBUG_RAMCONSOLE
         D("acoustic_register_ops \n");
+#endif
 	mutex_lock(&api_lock);
 	the_ops = ops;
 	mutex_unlock(&api_lock);
@@ -201,13 +203,17 @@ int htc_acoustic_query_feature(enum HTC_FEATURE feature)
 
 static int acoustic_open(struct inode *inode, struct file *file)
 {
+#ifdef CONFIG_HTC_DEBUG_RAMCONSOLE
 	D("open\n");
+#endif
 	return 0;
 }
 
 static int acoustic_release(struct inode *inode, struct file *file)
 {
+#ifdef CONFIG_HTC_DEBUG_RAMCONSOLE
 	D("release\n");
+#endif
 	return 0;
 }
 
@@ -225,7 +231,9 @@ acoustic_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			rc = -EFAULT;
 			break;
 		}
+#ifdef CONFIG_HTC_DEBUG_RAMCONSOLE
 		D("Set Q6 Effect : %d\n", mode);
+#endif
 		if (mode < -1 || mode > 1) {
 			E("unsupported Q6 mode: %d\n", mode);
 			rc = -EINVAL;
@@ -260,8 +268,9 @@ acoustic_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case ACOUSTIC_GET_DMIC_INFO:
 		if (the_ops->enable_digital_mic)
 			rc = the_ops->enable_digital_mic();
-
+#ifdef CONFIG_HTC_DEBUG_RAMCONSOLE
 		D("support components: 0x%x\n", rc);
+#endif
 		if(copy_to_user((void *)arg, &rc, sizeof(rc))) {
 			E("acoustic_ioctl: copy to user failed\n");
 			rc = -EINVAL;
@@ -270,8 +279,9 @@ acoustic_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case ACOUSTIC_GET_MID:
 		if (the_ops->get_mid)
 			mid = the_ops->get_mid();
-
+#ifdef CONFIG_HTC_DEBUG_RAMCONSOLE
 		D("get mid: %s\n", mid);
+#endif
 		if(copy_to_user((void *)arg, mid, strlen(mid))) {
 			E("acoustic_ioctl: copy to user failed\n");
 			rc = -EINVAL;
@@ -320,7 +330,9 @@ acoustic_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			rc = -EFAULT;
 			break;
 		}
+#ifdef CONFIG_HTC_DEBUG_RAMCONSOLE
 		D("control wakelock : %d\n", new_state);
+#endif
 		if (new_state == 1) {
 			wake_lock_timeout(&htc_acoustic_wakelock, 60*HZ);
 		} else {
@@ -340,7 +352,9 @@ acoustic_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			rc = -EFAULT;
 			break;
 		}
+#ifdef CONFIG_HTC_DEBUG_RAMCONSOLE
 		D("Update listen notification : %d\n", new_state);
+#endif
 		if (new_state < -1 || new_state > 1) {
 			E("Invalid listen notification state");
 			rc = -EINVAL;

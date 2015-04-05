@@ -197,8 +197,8 @@ int decode_encode_hdlc(void*data, int *len, unsigned char *buf_hdlc, int remove,
 	enc.dest_last = (void *)(buf_hdlc + 2*hdlc.dest_idx  - 3);
 	diag_hdlc_encode(&send, &enc);
 
-	print_hex_dump(KERN_DEBUG, "encode Data"
-			, DUMP_PREFIX_ADDRESS, 16, 1, buf_hdlc, hdlc.dest_idx, 1);
+//	print_hex_dump(KERN_DEBUG, "encode Data"
+//			, DUMP_PREFIX_ADDRESS, 16, 1, buf_hdlc, hdlc.dest_idx, 1);
 
 	*len = hdlc.dest_idx;
 
@@ -359,13 +359,14 @@ int modem_to_userspace(void *buf, int r, int type, int is9k)
 		}
 	}
 #endif
-
+/*
 	if (is9k == 1)
 		print_hex_dump(KERN_DEBUG, "DM Read Packet Data"
 				" from 9k radio (first 16 Bytes): ", DUMP_PREFIX_ADDRESS, 16, 1, req->buf, 16, 1);
 	else
 		print_hex_dump(KERN_DEBUG, "DM Read Packet Data"
 				" from 7k radio (first 16 Bytes): ", DUMP_PREFIX_ADDRESS, 16, 1, req->buf, 16, 1);
+*/
 #if defined(CONFIG_DIAGFWD_BRIDGE_CODE)
 	diagfwd_write_complete_hsic(NULL);
 	if (driver->hsic_ch)
@@ -433,8 +434,8 @@ static long htc_diag_ioctl(struct file *file, unsigned int cmd, unsigned long ar
 			return -EFAULT;
 		spin_lock_irqsave(&ctxt->req_lock, flags);
 		memcpy(ctxt->id_table, temp_id_table, ID_TABLE_SZ);
-		print_hex_dump(KERN_DEBUG, "ID_TABLE_SZ Data: ", DUMP_PREFIX_ADDRESS, 16, 1,
-				temp_id_table, ID_TABLE_SZ, 1);
+//		print_hex_dump(KERN_DEBUG, "ID_TABLE_SZ Data: ", DUMP_PREFIX_ADDRESS, 16, 1,
+//				temp_id_table, ID_TABLE_SZ, 1);
 		spin_unlock_irqrestore(&ctxt->req_lock, flags);
 		break;
 
@@ -913,8 +914,8 @@ static long diag2arm9_ioctl(struct file *file, unsigned int cmd, unsigned long a
 
 	spin_lock_irqsave(&ctxt->req_lock, flags);
 	memcpy((uint8_t *)table_ptr, (uint8_t *)&temp_nv_table[0], (temp_nv_table[0]+1)*2);
-	print_hex_dump(KERN_DEBUG, "TABLE Data: ", DUMP_PREFIX_ADDRESS, 16, 1,
-			table_ptr, (*table_ptr+1)*2, 1);
+//	print_hex_dump(KERN_DEBUG, "TABLE Data: ", DUMP_PREFIX_ADDRESS, 16, 1,
+//			table_ptr, (*table_ptr+1)*2, 1);
 	spin_unlock_irqrestore(&ctxt->req_lock, flags);
 
 	return 0;
@@ -1044,13 +1045,13 @@ static ssize_t diag2arm9_write(struct file *fp, const char __user *buf,
 #if defined(CONFIG_MACH_MECHA) || defined(CONFIG_MACH_VIGOR) || defined(CONFIG_ARCH_MSM8960) || defined(CONFIG_ARCH_DUMMY) || defined(CONFIG_ARCH_MSM8226)
 		path = checkcmd_modem_epst(ctxt->DM_buf);
 
-		print_hex_dump(KERN_DEBUG, "DM Packet Data"
-				" write to radio ", DUMP_PREFIX_ADDRESS, 16, 1, ctxt->DM_buf, writed, 1);
+//		print_hex_dump(KERN_DEBUG, "DM Packet Data"
+//				" write to radio ", DUMP_PREFIX_ADDRESS, 16, 1, ctxt->DM_buf, writed, 1);
 
 		switch (path) {
 		case DM7K9K:
 			DIAG_INFO("%s:above date to DM7K9K\n", __func__);
-			
+
 #if defined(CONFIG_MACH_MECHA)
 			if (sdio_diag_initialized) {
 				buf_9k = kzalloc(writed, GFP_KERNEL);
@@ -1072,7 +1073,7 @@ static ssize_t diag2arm9_write(struct file *fp, const char __user *buf,
 				DIAG_INFO("%s: sdio ch fails\n", __func__);
 			}
 #endif
-			
+
 			hdlc.dest_ptr = ctxt->toARM9_buf;
 			hdlc.dest_size = SMD_MAX;
 			hdlc.src_ptr = ctxt->DM_buf;
@@ -1213,8 +1214,8 @@ static ssize_t diag2arm9_write(struct file *fp, const char __user *buf,
 		case NO_DEF_ITEM:
 		default:
 			DIAG_INFO("%s:no default routing path\n", __func__);
-			print_hex_dump(KERN_DEBUG, "DM Packet Data"
-					" write to radio ", DUMP_PREFIX_ADDRESS, 16, 1, ctxt->DM_buf, writed, 1);
+//			print_hex_dump(KERN_DEBUG, "DM Packet Data"
+//					" write to radio ", DUMP_PREFIX_ADDRESS, 16, 1, ctxt->DM_buf, writed, 1);
 		}
 #endif
 		buf += writed;
@@ -1278,8 +1279,8 @@ retry:
 	r += xfer;
 	
 	if (ctxt->read_arm9_count == 0) {
-		print_hex_dump(KERN_DEBUG, "DM Packet Data"
-				" read from radio ", DUMP_PREFIX_ADDRESS, 16, 1, req->buf, req->actual, 1);
+//		print_hex_dump(KERN_DEBUG, "DM Packet Data"
+//				" read from radio ", DUMP_PREFIX_ADDRESS, 16, 1, req->buf, req->actual, 1);
 		xpst_req_put(ctxt, &ctxt->rx_arm9_idle, ctxt->read_arm9_req);
 		ctxt->read_arm9_req = 0;
 	}

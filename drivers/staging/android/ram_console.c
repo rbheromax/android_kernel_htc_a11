@@ -30,8 +30,9 @@ static size_t bootinfo_size;
 static char *rst_msg_buf;
 static unsigned long rst_msg_buf_size = 0;
 
-#if defined(CONFIG_HTC_DEBUG_RAMCONSOLE)
 #include <mach/devices_cmdline.h>
+
+#if defined(CONFIG_HTC_DEBUG_RAMCONSOLE)
 
 static size_t bl_old_log_size;
 static const char *bl_old_log;
@@ -278,9 +279,9 @@ static int __init ram_console_module_init(void)
 	return platform_driver_register(&ram_console_driver);
 }
 
-#ifndef CONFIG_PRINTK
+//#ifndef CONFIG_PRINTK
 #define dmesg_restrict	0
-#endif
+//#endif
 
 static ssize_t ram_console_read_old(struct file *file, char __user *buf,
 				    size_t len, loff_t *offset)
@@ -292,10 +293,10 @@ static ssize_t ram_console_read_old(struct file *file, char __user *buf,
 	const char *old_log = persistent_ram_old(prz);
 	char *str;
 	int ret;
-
+/*
 	if (dmesg_restrict && !capable(CAP_SYSLOG))
 		return -EPERM;
-
+*/
 #if defined(CONFIG_HTC_DEBUG_RAMCONSOLE)
 	
 	if (pos < bl_old_log_buf_size) {

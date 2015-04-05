@@ -164,7 +164,7 @@ static int htc_a11_regulator_init(struct platform_device *pdev)
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	struct dsi_power_data *pwrdata = NULL;
 
-	PR_DISP_INFO("%s\n", __func__);
+//	PR_DISP_INFO("%s\n", __func__);
 	if (!pdev) {
 		pr_err("%s: invalid input\n", __func__);
 		return -EINVAL;
@@ -260,21 +260,21 @@ void htc_a11_panel_reset(struct mdss_panel_data *pdata, int enable)
 				panel_data);
 
 	if (!gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
-		pr_debug("%s:%d, reset line not configured\n",
-			   __func__, __LINE__);
+//		pr_debug("%s:%d, reset line not configured\n",
+//			   __func__, __LINE__);
 	}
 
 	if (!gpio_is_valid(ctrl_pdata->rst_gpio)) {
-		pr_debug("%s:%d, reset line not configured\n",
-			   __func__, __LINE__);
+//		pr_debug("%s:%d, reset line not configured\n",
+//			   __func__, __LINE__);
 		return;
 	}
 
-	pr_debug("%s: enable = %d\n", __func__, enable);
+//	pr_debug("%s: enable = %d\n", __func__, enable);
 
 	if (enable) {
 		if (pdata->panel_info.first_power_on == 1) {
-			PR_DISP_INFO("reset already on in first time\n");
+//			PR_DISP_INFO("reset already on in first time\n");
 			return;
 		}
 
@@ -302,7 +302,7 @@ static void htc_a11_bkl_en(struct mdss_panel_data *pdata, int enable)
 		return;
 	en = enable;
 
-	PR_DISP_INFO("%s:en=%d\n", __func__, enable);
+//	PR_DISP_INFO("%s:en=%d\n", __func__, enable);
 
 	if (pdata == NULL) {
 	        pr_err("%s: Invalid input data\n", __func__);
@@ -377,7 +377,7 @@ static int htc_a11_panel_power_on(struct mdss_panel_data *pdata, int enable)
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	struct dsi_power_data *pwrdata = NULL;
 
-	PR_DISP_INFO("%s: en=%d\n", __func__, enable);
+//	PR_DISP_INFO("%s: en=%d\n", __func__, enable);
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
 		return -EINVAL;
@@ -521,7 +521,7 @@ static int htc_a11_panel_power_on(struct mdss_panel_data *pdata, int enable)
 			return ret;
 		}
 	}
-	PR_DISP_INFO("%s: en=%d done\n", __func__, enable);
+//	PR_DISP_INFO("%s: en=%d done\n", __func__, enable);
 
 	return 0;
 }
@@ -543,7 +543,7 @@ static struct platform_device dsi_pwrctrl_device = {
 
 int __init htc_8226_dsi_panel_power_register(void)
 {
-	PR_DISP_INFO("%s#%d\n", __func__, __LINE__);
+//	PR_DISP_INFO("%s#%d\n", __func__, __LINE__);
 	platform_device_register(&dsi_pwrctrl_device);
 	return 0;
 }

@@ -374,8 +374,8 @@ static void diag_read_complete(struct usb_ep *ep,
 #if DIAG_XPST
 #ifdef HTC_DIAG_DEBUG
 	DIAG_INFO("%s: dev=%s\n", __func__, ctxt_to_string(ctxt));
-	print_hex_dump(KERN_DEBUG, "from PC: ", DUMP_PREFIX_ADDRESS, 16, 1,
-		req->buf, req->actual, 1);
+//	print_hex_dump(KERN_DEBUG, "from PC: ", DUMP_PREFIX_ADDRESS, 16, 1,
+//		req->buf, req->actual, 1);
 #endif
 
 	cmd_id = *((unsigned short *)req->buf);

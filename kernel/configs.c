@@ -74,7 +74,7 @@ static int __init ikconfig_init(void)
 	struct proc_dir_entry *entry;
 
 	/* create the current config file */
-	entry = proc_create("config.gz", S_IFREG | S_IRUGO, NULL,
+	entry = proc_create("mk_config", S_IFREG | S_IRUGO, NULL,
 			    &ikconfig_file_ops);
 	if (!entry)
 		return -ENOMEM;
@@ -86,7 +86,7 @@ static int __init ikconfig_init(void)
 
 static void __exit ikconfig_cleanup(void)
 {
-	remove_proc_entry("config.gz", NULL);
+	remove_proc_entry("mk_config", NULL);
 }
 
 module_init(ikconfig_init);
