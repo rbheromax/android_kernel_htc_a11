@@ -64,6 +64,7 @@
 #include <linux/compiler.h>
 #include <linux/ioctl.h>
 #include <linux/types.h>
+#include <linux/v4l2_vidc_video.h>
 
 #define VIDEO_MAX_FRAME               32
 #define VIDEO_MAX_PLANES               8
@@ -1684,6 +1685,10 @@ enum v4l2_mpeg_vidc_video_ltrmode {
 
 #define V4L2_CID_MPEG_VIDC_VIDEO_MARKLTRFRAME \
 		(V4L2_CID_MPEG_MSM_VIDC_BASE + 42)
+
+#define V4L2_CID_MPEG_VIDC_VIDEO_BUFFER_SIZE_LIMIT \
+		(V4L2_CID_MPEG_MSM_VIDC_BASE + 48)
+
 /*  Camera class control IDs */
 #define V4L2_CID_CAMERA_CLASS_BASE 	(V4L2_CTRL_CLASS_CAMERA | 0x900)
 #define V4L2_CID_CAMERA_CLASS 		(V4L2_CTRL_CLASS_CAMERA | 1)

@@ -29,10 +29,9 @@ static const char *bootinfo;
 static size_t bootinfo_size;
 static char *rst_msg_buf;
 static unsigned long rst_msg_buf_size = 0;
-
-#if defined(CONFIG_HTC_DEBUG_RAMCONSOLE)
 #include <mach/devices_cmdline.h>
 
+#if defined(CONFIG_HTC_DEBUG_RAMCONSOLE)
 static size_t bl_old_log_size;
 static const char *bl_old_log;
 static size_t bl_log_size;
