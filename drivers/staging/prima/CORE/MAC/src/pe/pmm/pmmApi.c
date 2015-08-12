@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
  *
  * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
  *
@@ -18,14 +18,28 @@
  * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
  * PERFORMANCE OF THIS SOFTWARE.
  */
-
 /*
- * This file was originally distributed by Qualcomm Atheros, Inc.
- * under proprietary terms before Copyright ownership was assigned
- * to the Linux Foundation.
+ * Copyright (c) 2012, The Linux Foundation. All rights reserved.
+ *
+ * Previously licensed under the ISC license by Qualcomm Atheros, Inc.
+ *
+ *
+ * Permission to use, copy, modify, and/or distribute this software for
+ * any purpose with or without fee is hereby granted, provided that the
+ * above copyright notice and this permission notice appear in all
+ * copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+ * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL
+ * DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR
+ * PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
+ * TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+ * PERFORMANCE OF THIS SOFTWARE.
  */
-
 /*
+ * Airgo Networks, Inc proprietary. All rights reserved.
  * This file pmmApi.cc contains functions related to the API exposed
  * by power management module
  *
@@ -38,7 +52,7 @@
  */
 
 #include "palTypes.h"
-#include "wniCfg.h"
+#include "wniCfgSta.h"
 
 #include "sirCommon.h"
 #include "aniGlobal.h"
@@ -67,11 +81,6 @@
 #endif
 
 #include "wlan_qct_wda.h"
-
-#define LIM_ADMIT_MASK_FLAG_ACBE 1
-#define LIM_ADMIT_MASK_FLAG_ACBK 2
-#define LIM_ADMIT_MASK_FLAG_ACVI 4
-#define LIM_ADMIT_MASK_FLAG_ACVO 8
 
 // --------------------------------------------------------------------
 /**
@@ -230,8 +239,8 @@ void pmmInitBmpsResponseHandler(tpAniSirGlobal pMac, tpSirMsgQ limMsg )
     //If response is failure, then send the response back to PMC and reset its state.
     if(pEnterBmpsParams->status == eHAL_STATUS_SUCCESS)
     {
-        pmmLog(pMac, LOG1,
-            FL("pmmBmps: Received successful response from HAL to enter BMPS_POWER_SAVE "));
+        PELOG2(pmmLog(pMac, LOG2,
+            FL("pmmBmps: Received successful response from HAL to enter BMPS_POWER_SAVE "));)
 
         pMac->pmm.gPmmState = ePMM_STATE_BMPS_SLEEP;
 
@@ -311,18 +320,16 @@ void pmmExitBmpsRequestHandler(tpAniSirGlobal pMac, tpExitBmpsInfo pExitBmpsInfo
 
     tPmmState origState = pMac->pmm.gPmmState;
 
+#ifdef FEATURE_WLAN_DIAG_SUPPORT 
+    limDiagEventReport(pMac, WLAN_PE_DIAG_EXIT_BMPS_REQ_EVENT, peGetValidPowerSaveSession(pMac), 0, (tANI_U16)pExitBmpsInfo->exitBmpsReason);
+#endif //FEATURE_WLAN_DIAG_SUPPORT
+
     if (NULL == pExitBmpsInfo)
     {
         respStatus = eSIR_SME_BMPS_REQ_REJECT;
         PELOGW(pmmLog(pMac, LOGW, FL("pmmBmps: Rcvd EXIT_BMPS with NULL body"));)
         goto failure;
     }
-
-#ifdef FEATURE_WLAN_DIAG_SUPPORT
-    limDiagEventReport(pMac, WLAN_PE_DIAG_EXIT_BMPS_REQ_EVENT,
-                       peGetValidPowerSaveSession(pMac), 0,
-                       (tANI_U16)pExitBmpsInfo->exitBmpsReason);
-#endif //FEATURE_WLAN_DIAG_SUPPORT
 
     /* PMC is not aware of Background scan, which is done in
      * BMPS mode while Nth Beacon is delivered. Essentially, PMC
@@ -363,8 +370,8 @@ void pmmExitBmpsRequestHandler(tpAniSirGlobal pMac, tpExitBmpsInfo pExitBmpsInfo
         }
         else
         {
-            pmmLog(pMac, LOG1,
-                          FL("pmmBmps: eWNI_PMC_EXIT_BMPS_REQ was successfully sent to HAL"));
+            PELOG1(pmmLog(pMac, LOG1,
+                          FL("pmmBmps: eWNI_PMC_EXIT_BMPS_REQ was successfully sent to HAL"));)
         }
     }
     else
@@ -516,9 +523,6 @@ failure:
     // Change the state back to original state
     pMac->pmm.gPmmState =origState;
     limSendSmeRsp(pMac, eWNI_PMC_ENTER_BMPS_RSP, respStatus, 0, 0);
-
-    // update the BMPS pwr save Error Stats
-    pmmBmpsUpdateSleepReqFailureCnt(pMac);
     return;
 }
 
@@ -596,7 +600,7 @@ tSirRetStatus pmmSendChangePowerSaveMsg(tpAniSirGlobal pMac)
         return retStatus;
     }
 
-    pmmLog(pMac, LOG1, FL("WDA_EXIT_BMPS_REQ has been successfully sent to HAL"));
+    PELOG1(pmmLog(pMac, LOG1, FL("WDA_EXIT_BMPS_REQ has been successfully sent to HAL"));)
     return retStatus;
 }
 
@@ -677,7 +681,7 @@ tSirRetStatus  pmmSendInitPowerSaveMsg(tpAniSirGlobal pMac,tpPESession psessionE
             (tANI_U8)GET_MIN_VALUE((tANI_U8) numBeaconPerRssiAverage, WNI_CFG_NUM_BEACON_PER_RSSI_AVERAGE_STAMAX);
 
     pmmLog (pMac, LOG1,
-        "%s: RssiFilterInfo..%d %x %x", __func__, (int)pBmpsParams->bRssiFilterEnable,
+        "%s: [INFOLOG]RssiFilterInfo..%d %x %x", __func__, (int)pBmpsParams->bRssiFilterEnable,
         (unsigned int)pBmpsParams->rssiFilterPeriod, (unsigned int)pBmpsParams->numBeaconPerRssiAverage);
 
     msgQ.type = WDA_ENTER_BMPS_REQ;
@@ -685,8 +689,8 @@ tSirRetStatus  pmmSendInitPowerSaveMsg(tpAniSirGlobal pMac,tpPESession psessionE
     msgQ.bodyptr = pBmpsParams;
     msgQ.bodyval = 0;
 
-    pmmLog( pMac, LOG1,
-        FL( "pmmBmps: Sending WDA_ENTER_BMPS_REQ" ));
+    PELOG2(pmmLog( pMac, LOG2,
+        FL( "pmmBmps: Sending WDA_ENTER_BMPS_REQ" ));)
 
     /* we need to defer any incoming messages until we get a
      * WDA_ENTER_BMPS_RSP from HAL.
@@ -792,7 +796,7 @@ tSirRetStatus pmmSendPowerSaveCfg(tpAniSirGlobal pMac, tpSirPowerSaveCfg pUpdate
     msgQ.bodyptr = pUpdatedPwrSaveCfg;
     msgQ.bodyval = 0;
 
-    pmmLog( pMac, LOG1, FL( "pmmBmps: Sending WDA_PWR_SAVE_CFG to HAL"));
+    PELOG1(pmmLog( pMac, LOG1, FL( "pmmBmps: Sending WDA_PWR_SAVE_CFG to HAL"));)
     MTRACE(macTraceMsgTx(pMac, NO_SESSION, msgQ.type));
     if( eSIR_SUCCESS != (retCode = wdaPostCtrlMsg( pMac, &msgQ )))
     {
@@ -839,7 +843,7 @@ void pmmExitBmpsResponseHandler(tpAniSirGlobal pMac,  tpSirMsgQ limMsg)
     tANI_U8 PowersavesessionId;
     tpPESession psessionEntry;
     tSirResultCodes retStatus = eSIR_SME_SUCCESS;
-
+    
     /* Copy the power save sessionId to the local variable */
     PowersavesessionId = pMac->pmm.sessionId;
 
@@ -851,10 +855,14 @@ void pmmExitBmpsResponseHandler(tpAniSirGlobal pMac,  tpSirMsgQ limMsg)
 
     if((psessionEntry = peFindSessionBySessionId(pMac,PowersavesessionId))==NULL)
     {
-        pmmLog(pMac, LOGP,FL("Session Does not exist for given sessionID"));
+        limLog(pMac, LOGP,FL("Session Does not exist for given sessionID"));
         return;
     }
 
+    
+
+    /* Update wakeup statistics */
+    pmmUpdateWakeupStats(pMac);
 
     if (NULL == limMsg->bodyptr)
     {
@@ -885,8 +893,6 @@ void pmmExitBmpsResponseHandler(tpAniSirGlobal pMac,  tpSirMsgQ limMsg)
     {
         case eHAL_STATUS_SUCCESS:
             retStatus = eSIR_SME_SUCCESS;
-            /* Update wakeup statistics */
-            pmmUpdateWakeupStats(pMac);
             break;
 
         default:
@@ -896,13 +902,13 @@ void pmmExitBmpsResponseHandler(tpAniSirGlobal pMac,  tpSirMsgQ limMsg)
                  * But, PMC will be informed about the error.
                  */
                 retStatus = eSIR_SME_BMPS_REQ_FAILED;
-                pmmBmpsUpdateWakeupReqFailureCnt(pMac);
             }
             break;
 
     }
 
     pMac->pmm.gPmmState = ePMM_STATE_BMPS_WAKEUP;
+    pmmUpdateWakeupStats(pMac);
 
     // turn on background scan
     pMac->sys.gSysEnableScanMode = true;
@@ -910,7 +916,7 @@ void pmmExitBmpsResponseHandler(tpAniSirGlobal pMac,  tpSirMsgQ limMsg)
     // send response to PMC
    if(IS_FEATURE_SUPPORTED_BY_FW(SLM_SESSIONIZATION) )
    {
-       limSendSmeRsp(pMac, eWNI_PMC_EXIT_BMPS_RSP, retStatus,
+       limSendSmeRsp(pMac, eWNI_PMC_EXIT_BMPS_RSP, retStatus, 
                   psessionEntry->smeSessionId, psessionEntry->transactionId);
    }
    else
@@ -960,7 +966,7 @@ void pmmMissedBeaconHandler(tpAniSirGlobal pMac)
 
     if((psessionEntry = peFindSessionBySessionId(pMac,pwrSaveSessionId))==NULL)
     {
-        pmmLog(pMac, LOGE,FL("Session Does not exist for given sessionID"));
+        limLog(pMac, LOGE,FL("Session Does not exist for given sessionID"));
         return;
     }
 
@@ -972,7 +978,7 @@ void pmmMissedBeaconHandler(tpAniSirGlobal pMac)
        (pMac->lim.gLimTimersCreated))
     {
         if (wlan_cfgGetInt(pMac, WNI_CFG_BEACON_INTERVAL, &beaconInterval) != eSIR_SUCCESS)
-            pmmLog(pMac, LOG1, FL("Fail to get BEACON_INTERVAL value"));
+            PELOG1(pmmLog(pMac, LOG1, FL("Fail to get BEACON_INTERVAL value"));)
 
         /* Change timer to reactivate it in future */
         heartBeatInterval= SYS_MS_TO_TICKS(beaconInterval * heartBeatInterval);
@@ -980,7 +986,7 @@ void pmmMissedBeaconHandler(tpAniSirGlobal pMac)
         if( tx_timer_change(&pMac->lim.limTimers.gLimHeartBeatTimer,
                             (tANI_U32)heartBeatInterval, 0) != TX_SUCCESS)
         {
-            pmmLog(pMac, LOG1, FL("Fail to change HeartBeat timer"));
+            PELOG1(pmmLog(pMac, LOG1, FL("Fail to change HeartBeat timer"));)
         }
 
         /* update some statistics */
@@ -1055,8 +1061,7 @@ void pmmExitBmpsIndicationHandler(tpAniSirGlobal pMac, tANI_U8 mode, eHalStatus 
 
     if(psessionEntry == NULL)
     {
-      PELOGE(pmmLog(pMac, LOGE,
-             FL("Session does Not exist with given sessionId :%d "),powersavesessionId);)
+      PELOGE(limLog(pMac, LOGE,FL("Session does Not exist with given sessionId :%d "),powersavesessionId);)
       return;
     }
 
@@ -1091,8 +1096,8 @@ void pmmExitBmpsIndicationHandler(tpAniSirGlobal pMac, tANI_U8 mode, eHalStatus 
          */
         case eHAL_STATUS_HEARTBEAT_TMOUT:
             {
-                pmmLog(pMac, LOG1,
-                              FL("pmmBmps: The device woke up due to HeartBeat Timeout"));
+                PELOG1(pmmLog(pMac, LOG1,
+                              FL("pmmBmps: The device woke up due to HeartBeat Timeout"));)
 
                 /* Proceed only if HeartBeat timer is created */
                 if((pMac->lim.limTimers.gLimHeartBeatTimer.pMac) &&
@@ -1108,8 +1113,8 @@ void pmmExitBmpsIndicationHandler(tpAniSirGlobal pMac, tANI_U8 mode, eHalStatus 
                     if(tx_timer_change(&pMac->lim.limTimers.gLimHeartBeatTimer,
                                        (tANI_U32)heartBeatInterval, 0) != TX_SUCCESS)
                     {
-                        pmmLog(pMac, LOG1,
-                               FL("pmmBmps: Unable to change HeartBeat timer"));
+                        PELOG1(pmmLog(pMac, LOG1,
+                               FL("pmmBmps: Unable to change HeartBeat timer"));)
                     }
 
                     /* update some statistics */
@@ -1376,9 +1381,9 @@ void pmmUpdatePwrSaveStats(tpAniSirGlobal pMac)
 
     pMac->pmm.BmpsavgTimeAwake = ( ( (pMac->pmm.BmpsavgTimeAwake * pMac->pmm.BmpscntSleep) + TimeAwake ) / (pMac->pmm.BmpscntSleep + 1) );
 
-*/
     pMac->pmm.BmpscntSleep++;
     return;
+*/
 }
 
 
@@ -1420,9 +1425,9 @@ void pmmUpdateWakeupStats(tpAniSirGlobal pMac)
 
         pMac->pmm.BmpsavgSleepTime = ( ( (pMac->pmm.BmpsavgSleepTime * pMac->pmm.BmpscntAwake) + SleepTime ) / (pMac->pmm.BmpscntAwake + 1) );
 
-*/
         pMac->pmm.BmpscntAwake++;
         return;
+*/
 }
 
 // --------------------------------------------------------------------
@@ -1457,17 +1462,7 @@ void pmmEnterImpsRequestHandler (tpAniSirGlobal pMac)
     /*Returns True even single active session present */
     if(peIsAnySessionActive(pMac))
     {
-        /* Print active pesession and tracedump once in every 16
-         * continous error.
-         */
-        if (!(pMac->pmc.ImpsReqFailCnt & 0xF))
-        {
-            pePrintActiveSession(pMac);
-            vosTraceDumpAll(pMac,0,0,100,0);
-        }
         resultCode = eSIR_SME_INVALID_STATE;
-        pmmLog(pMac, LOGE, FL("Session is active go to failure resultCode = "
-               "eSIR_SME_INVALID_STATE (%d)"),resultCode);
         goto failure;
     }
 
@@ -1500,8 +1495,8 @@ void pmmEnterImpsRequestHandler (tpAniSirGlobal pMac)
     }
     else
     {
-        pmmLog(pMac, LOG1,
-               FL("pmmImps: Waiting for SoftMac response for IMPS request"));
+        PELOG1(pmmLog(pMac, LOG1,
+               FL("pmmImps: Waiting for SoftMac response for IMPS request"));)
     }
     return;
 
@@ -1539,7 +1534,6 @@ void pmmEnterImpsResponseHandler (tpAniSirGlobal pMac, eHalStatus rspStatus)
 {
     tPmmState nextState = pMac->pmm.gPmmState;
     tSirResultCodes resultCode = eSIR_SME_SUCCESS;
-    static int failCnt = 0;
 
     /* we need to process all the deferred messages enqueued since
      * the initiating the WDA_ENTER_IMPS_REQ.
@@ -1563,8 +1557,8 @@ void pmmEnterImpsResponseHandler (tpAniSirGlobal pMac, eHalStatus rspStatus)
         //if success, change the state to IMPS sleep mode
         pMac->pmm.gPmmState = ePMM_STATE_IMPS_SLEEP;
 
-        pmmLog(pMac, LOG1,
-            FL("pmmImps: Received successful WDA_ENTER_IMPS_RSP from HAL"));
+        PELOG2(pmmLog(pMac, LOG2,
+            FL("pmmImps: Received successful WDA_ENTER_IMPS_RSP from HAL"));)
 
         //update power save statistics
         pmmImpsUpdatePwrSaveStats(pMac);
@@ -1583,14 +1577,10 @@ void pmmEnterImpsResponseHandler (tpAniSirGlobal pMac, eHalStatus rspStatus)
     return;
 
 failure:
-    if (!(failCnt & 0xF))
-         PELOGE(pmmLog(pMac, LOGE,
+    PELOGE(pmmLog(pMac, LOGE, 
            FL("pmmImpsSleepRsp failed, Ret Code: %d, next state will be: %d"),
            rspStatus,
            pMac->pmm.gPmmState);)
-
-    failCnt++;
-    pmmImpsUpdateSleepErrStats(pMac, rspStatus);
 
     pMac->pmm.gPmmState = nextState;
 
@@ -1645,7 +1635,7 @@ void pmmExitImpsRequestHandler (tpAniSirGlobal pMac)
     {
         // PE in invalid state 
         PELOGE(pmmLog(pMac, LOGE, 
-                      FL("pmmImps: Wakeup Req received in invalid state: %d"),
+                      FL("pmmImps: Wakeup Req received in invalid state: %x"),
                       pMac->pmm.gPmmState);)
 
         resultCode = eSIR_SME_INVALID_PMM_STATE;
@@ -1713,31 +1703,25 @@ void pmmExitImpsResponseHandler(tpAniSirGlobal pMac, eHalStatus rspStatus)
     case eHAL_STATUS_SUCCESS:
         {
             resultCode = eSIR_SME_SUCCESS;
-            pMac->pmm.gPmmState = ePMM_STATE_IMPS_WAKEUP;
-            pmmLog(pMac, LOG1,
-                          FL("pmmImps: Received WDA_EXIT_IMPS_RSP with Successful response from HAL"));
-            //update power save statistics
-            pmmImpsUpdateWakeupStats(pMac);
+            PELOG2(pmmLog(pMac, LOG2, 
+                          FL("pmmImps: Received WDA_EXIT_IMPS_RSP with Successful response from HAL"));)
         }
         break;
 
         default:
             {
                 resultCode = eSIR_SME_IMPS_REQ_FAILED;
-                /* Set the status back to IMPS SLEEP as we failed
-                 * to come out of sleep
-                 */
-                pMac->pmm.gPmmState = ePMM_STATE_IMPS_SLEEP;
                 PELOGW(pmmLog(pMac, LOGW, 
                               FL("pmmImps: Received WDA_EXIT_IMPS_RSP with Failure Status from HAL"));)
-                // update th power save error stats
-                pmmImpsUpdateWakeupErrStats(pMac, rspStatus);
             }
             break;
 
     }
 
+    pMac->pmm.gPmmState = ePMM_STATE_IMPS_WAKEUP;
 
+    //update power save statistics
+    pmmImpsUpdateWakeupStats(pMac);
 
     limSendSmeRsp(pMac,
                   eWNI_PMC_EXIT_IMPS_RSP,
@@ -1790,14 +1774,11 @@ void pmmEnterUapsdRequestHandler (tpAniSirGlobal pMac)
     {
         PELOGE(pmmLog(pMac, LOGE,
             FL("pmmUapsd: HAL_ENTER_UAPSD_REQ failed with response: %x"), retStatus);)
-        if (retStatus == eSIR_PMM_INVALID_REQ)
-            resultCode = eSIR_SME_UAPSD_REQ_INVALID;
-        else
-            resultCode = eSIR_SME_UAPSD_REQ_FAILED;
+        resultCode = eSIR_SME_UAPSD_REQ_FAILED;
         goto failure;
     }
 
-    pmmLog(pMac, LOG1, FL("pmmUapsd: Waiting for WDA_ENTER_UAPSD_RSP "));
+    PELOG1(pmmLog(pMac, LOG1, FL("pmmUapsd: Waiting for WDA_ENTER_UAPSD_RSP "));)
     return;
 
 failure:
@@ -1847,7 +1828,7 @@ void pmmEnterUapsdResponseHandler(tpAniSirGlobal pMac, tpSirMsgQ limMsg)
 
     if((psessionEntry = peFindSessionBySessionId(pMac,PowersavesessionId))==NULL)
     {
-        pmmLog(pMac, LOGP,FL("Session Does not exist for given sessionID"));
+        limLog(pMac, LOGP,FL("Session Does not exist for given sessionID"));
         return;
     }
 
@@ -1930,7 +1911,7 @@ void pmmExitUapsdRequestHandler(tpAniSirGlobal pMac)
     else
     {
         PELOGE(pmmLog(pMac, LOGE,
-            FL("pmmUapsd: Rcv EXIT_UAPSD from PMC in invalid state: %d"),
+            FL("pmmUapsd: Rcv EXIT_UAPSD from PMC in invalid state: %x"),
             pMac->pmm.gPmmState);)
 
         resultCode = eSIR_SME_INVALID_PMM_STATE;
@@ -1987,7 +1968,7 @@ void pmmExitUapsdResponseHandler(tpAniSirGlobal pMac,  tpSirMsgQ limMsg)
     PowersavesessionId = pMac->pmm.sessionId;
     if((psessionEntry = peFindSessionBySessionId(pMac,PowersavesessionId))==NULL)
     {
-        pmmLog(pMac, LOGP,FL("Session Does not exist for given sessionID"));
+        limLog(pMac, LOGP,FL("Session Does not exist for given sessionID"));
         return;
     }
 
@@ -2148,7 +2129,7 @@ void pmmEnterWowlRequestHandler(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
     pSmeWowlParams = (tpSirSmeWowlEnterParams)(pMbMsg->data);
     if (NULL == pSmeWowlParams)
     {
-        pmmLog(pMac, LOGE,
+        limLog(pMac, LOGE,
                FL("NULL message received"));
         return;
     }
@@ -2157,7 +2138,7 @@ void pmmEnterWowlRequestHandler(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
                                          &peSessionId);
     if (NULL == pSessionEntry)
     {
-        pmmLog(pMac, LOGE,
+        limLog(pMac, LOGE,
                FL("session does not exist for given BSSId"));
         goto end;
     }
@@ -2207,42 +2188,42 @@ void pmmEnterWowlRequestHandler(tpAniSirGlobal pMac, tpSirMsgQ pMsg)
 
     if(wlan_cfgGetInt(pMac, WNI_CFG_WOWLAN_UCAST_PATTERN_FILTER_ENABLE, &cfgValue) != eSIR_SUCCESS)
     {
-        pmmLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_UCAST_PATTERN_FILTER_ENABLE"));
+        limLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_UCAST_PATTERN_FILTER_ENABLE"));
         goto end;
     }
     pHalWowlParams->ucUcastPatternFilteringEnable = (tANI_U8)cfgValue;
 
     if(wlan_cfgGetInt(pMac, WNI_CFG_WOWLAN_CHANNEL_SWITCH_ENABLE, &cfgValue) != eSIR_SUCCESS)
     {
-        pmmLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_CHANNEL_SWITCH_ENABLE"));
+        limLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_CHANNEL_SWITCH_ENABLE"));
         goto end;
     }
     pHalWowlParams->ucWowChnlSwitchRcv = (tANI_U8)cfgValue;
 
     if(wlan_cfgGetInt(pMac, WNI_CFG_WOWLAN_DEAUTH_ENABLE, &cfgValue) != eSIR_SUCCESS)
     {
-       pmmLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_DEAUTH_ENABLE "));
+       limLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_DEAUTH_ENABLE "));
        goto end;
     }
     pHalWowlParams->ucWowDeauthRcv = (tANI_U8)cfgValue;
 
     if(wlan_cfgGetInt(pMac, WNI_CFG_WOWLAN_DISASSOC_ENABLE, &cfgValue) != eSIR_SUCCESS)
     {
-        pmmLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_DEAUTH_ENABLE "));
+        limLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_DEAUTH_ENABLE "));
         goto end;
     }
     pHalWowlParams->ucWowDisassocRcv = (tANI_U8)cfgValue;
 
     if(wlan_cfgGetInt(pMac, WNI_CFG_WOWLAN_MAX_MISSED_BEACON, &cfgValue) != eSIR_SUCCESS)
     {
-        pmmLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_MAX_MISSED_BEACON "));
+        limLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_MAX_MISSED_BEACON "));
         goto end;
     }
     pHalWowlParams->ucWowMaxMissedBeacons = (tANI_U8)cfgValue;
 
     if(wlan_cfgGetInt(pMac, WNI_CFG_WOWLAN_MAX_SLEEP_PERIOD, &cfgValue) != eSIR_SUCCESS)
     {
-        pmmLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_MAX_SLEEP_PERIOD "));
+        limLog(pMac, LOGP, FL("cfgGet failed for WNI_CFG_WOWLAN_MAX_SLEEP_PERIOD "));
         goto end;
     }
     pHalWowlParams->ucWowMaxSleepUsec = (tANI_U8)cfgValue;
@@ -2516,12 +2497,12 @@ tSirRetStatus pmmImpsSendChangePwrSaveMsg(tpAniSirGlobal pMac, tANI_U8 mode)
     if (SIR_PM_SLEEP_MODE == mode)
     {
         msgQ.type = WDA_ENTER_IMPS_REQ;
-        pmmLog (pMac, LOG1, FL("Sending WDA_ENTER_IMPS_REQ to HAL"));
+        PELOG2(pmmLog (pMac, LOG2, FL("Sending WDA_ENTER_IMPS_REQ to HAL"));)
     }
     else
     {
         msgQ.type = WDA_EXIT_IMPS_REQ;
-        pmmLog (pMac, LOG1, FL("Sending WDA_EXIT_IMPS_REQ to HAL"));
+        PELOG2(pmmLog (pMac, LOG2, FL("Sending WDA_EXIT_IMPS_REQ to HAL"));)
     }
 
     msgQ.reserved = 0;
@@ -2561,6 +2542,8 @@ tSirRetStatus pmmUapsdSendChangePwrSaveMsg (tpAniSirGlobal pMac, tANI_U8 mode)
 {
     tSirRetStatus retStatus = eSIR_SUCCESS;
     tpUapsdParams pUapsdParams = NULL;
+    tANI_U8  uapsdDeliveryMask = 0;
+    tANI_U8  uapsdTriggerMask = 0;
     tSirMsgQ msgQ;
     tpPESession pSessionEntry;
     tpExitUapsdParams pExitUapsdParams = NULL;
@@ -2586,118 +2569,36 @@ tSirRetStatus pmmUapsdSendChangePwrSaveMsg (tpAniSirGlobal pMac, tANI_U8 mode)
         msgQ.type = WDA_ENTER_UAPSD_REQ;
         msgQ.bodyptr = pUapsdParams;
 
-        /*
-        * An AC is delivery enabled AC if the bit for that AC is set into the
-        * gAcAdmitMask[SIR_MAC_DIRECTION_DLINK],it is not set then we will take Static values.
-        */
+        uapsdDeliveryMask = (pMac->lim.gUapsdPerAcBitmask | pMac->lim.gUapsdPerAcDeliveryEnableMask);
+        uapsdTriggerMask = (pMac->lim.gUapsdPerAcBitmask | pMac->lim.gUapsdPerAcTriggerEnableMask);
 
-        if ( pMac->lim.gAcAdmitMask[SIR_MAC_DIRECTION_DNLINK] & LIM_ADMIT_MASK_FLAG_ACBE)
-        {
-            pUapsdParams->beDeliveryEnabled = LIM_UAPSD_GET(ACBE, pMac->lim.gUapsdPerAcDeliveryEnableMask);
-        }
-        else
-        {
-            pUapsdParams->beDeliveryEnabled = LIM_UAPSD_GET(ACBE, pMac->lim.gUapsdPerAcBitmask);
-        }
-        if ( pMac->lim.gAcAdmitMask[SIR_MAC_DIRECTION_DNLINK] & LIM_ADMIT_MASK_FLAG_ACBK)
-        {
-            pUapsdParams->bkDeliveryEnabled = LIM_UAPSD_GET(ACBK, pMac->lim.gUapsdPerAcDeliveryEnableMask);
-        }
-        else
-        {
-            pUapsdParams->bkDeliveryEnabled = LIM_UAPSD_GET(ACBK, pMac->lim.gUapsdPerAcBitmask);
-        }
-        if  ( pMac->lim.gAcAdmitMask[SIR_MAC_DIRECTION_DNLINK] & LIM_ADMIT_MASK_FLAG_ACVI)
-        {
-            pUapsdParams->viDeliveryEnabled = LIM_UAPSD_GET(ACVI, pMac->lim.gUapsdPerAcDeliveryEnableMask);
-        }
-        else
-        {
-            pUapsdParams->viDeliveryEnabled = LIM_UAPSD_GET(ACVI, pMac->lim.gUapsdPerAcBitmask);
-        }
-
-        if ( pMac->lim.gAcAdmitMask[SIR_MAC_DIRECTION_DNLINK] & LIM_ADMIT_MASK_FLAG_ACVO)
-        {
-            pUapsdParams->voDeliveryEnabled = LIM_UAPSD_GET(ACVO, pMac->lim.gUapsdPerAcDeliveryEnableMask);
-        }
-        else
-        {
-            pUapsdParams->voDeliveryEnabled = LIM_UAPSD_GET(ACVO, pMac->lim.gUapsdPerAcBitmask);
-        }
-
-        /*
-        * An AC is trigger enabled AC if the bit for that AC is set into the
-        * gAcAdmitMask[SIR_MAC_DIRECTION_UPLINK],it is not set then we will take Static values.
-        */
-
-        if ( pMac->lim.gAcAdmitMask[SIR_MAC_DIRECTION_UPLINK] & LIM_ADMIT_MASK_FLAG_ACBE)
-        {
-             pUapsdParams->beTriggerEnabled = LIM_UAPSD_GET(ACBE, pMac->lim.gUapsdPerAcTriggerEnableMask);
-        }
-        else
-        {
-             pUapsdParams->beTriggerEnabled = LIM_UAPSD_GET(ACBE, pMac->lim.gUapsdPerAcBitmask);
-        }
-        if ( pMac->lim.gAcAdmitMask[SIR_MAC_DIRECTION_UPLINK] & LIM_ADMIT_MASK_FLAG_ACBK)
-        {
-             pUapsdParams->bkTriggerEnabled = LIM_UAPSD_GET(ACBK, pMac->lim.gUapsdPerAcTriggerEnableMask);
-        }
-        else
-        {
-             pUapsdParams->bkTriggerEnabled = LIM_UAPSD_GET(ACBK, pMac->lim.gUapsdPerAcBitmask);
-        }
-        if ( pMac->lim.gAcAdmitMask[SIR_MAC_DIRECTION_UPLINK] & LIM_ADMIT_MASK_FLAG_ACVI)
-        {
-             pUapsdParams->viTriggerEnabled = LIM_UAPSD_GET(ACVI, pMac->lim.gUapsdPerAcTriggerEnableMask);
-        }
-        else
-        {
-             pUapsdParams->viTriggerEnabled = LIM_UAPSD_GET(ACVI, pMac->lim.gUapsdPerAcBitmask);
-        }
-
-        if ( pMac->lim.gAcAdmitMask[SIR_MAC_DIRECTION_UPLINK] & LIM_ADMIT_MASK_FLAG_ACVO)
-        {
-             pUapsdParams->voTriggerEnabled = LIM_UAPSD_GET(ACVO, pMac->lim.gUapsdPerAcTriggerEnableMask);
-        }
-        else
-        {
-             pUapsdParams->voTriggerEnabled = LIM_UAPSD_GET(ACVO, pMac->lim.gUapsdPerAcBitmask);
-        }
-
+        pUapsdParams->bkDeliveryEnabled = LIM_UAPSD_GET(ACBK, uapsdDeliveryMask);
+        pUapsdParams->beDeliveryEnabled = LIM_UAPSD_GET(ACBE, uapsdDeliveryMask);
+        pUapsdParams->viDeliveryEnabled = LIM_UAPSD_GET(ACVI, uapsdDeliveryMask);
+        pUapsdParams->voDeliveryEnabled = LIM_UAPSD_GET(ACVO, uapsdDeliveryMask);
+        pUapsdParams->bkTriggerEnabled = LIM_UAPSD_GET(ACBK, uapsdTriggerMask);
+        pUapsdParams->beTriggerEnabled = LIM_UAPSD_GET(ACBE, uapsdTriggerMask);
+        pUapsdParams->viTriggerEnabled = LIM_UAPSD_GET(ACVI, uapsdTriggerMask);
+        pUapsdParams->voTriggerEnabled = LIM_UAPSD_GET(ACVO, uapsdTriggerMask);
         pUapsdParams->bssIdx = pSessionEntry->bssIdx;
 
-        PELOGW(pmmLog(pMac, LOGW,
+        PELOGE(pmmLog(pMac, LOGE, 
                       FL("UAPSD Mask:  static = 0x%x, DeliveryEnabled = 0x%x, TriggerEnabled = 0x%x "),
             pMac->lim.gUapsdPerAcBitmask,
             pMac->lim.gUapsdPerAcDeliveryEnableMask,
             pMac->lim.gUapsdPerAcTriggerEnableMask);)
 
-        PELOGW(pmmLog(pMac, LOGW, FL("Delivery Enabled: BK=%d, BE=%d, Vi=%d, Vo=%d "),
+        PELOG1(pmmLog(pMac, LOG1, FL("Delivery Enabled: BK=%d, BE=%d, Vi=%d, Vo=%d "),
             pUapsdParams->bkDeliveryEnabled, 
             pUapsdParams->beDeliveryEnabled, 
             pUapsdParams->viDeliveryEnabled, 
             pUapsdParams->voDeliveryEnabled);)
 
-        PELOGW(pmmLog(pMac, LOGW, FL("Trigger Enabled: BK=%d, BE=%d, Vi=%d, Vo=%d "),
+        PELOG1(pmmLog(pMac, LOG1, FL("Trigger Enabled: BK=%d, BE=%d, Vi=%d, Vo=%d "),
             pUapsdParams->bkTriggerEnabled, 
             pUapsdParams->beTriggerEnabled, 
             pUapsdParams->viTriggerEnabled, 
             pUapsdParams->voTriggerEnabled);)
-
-        if (pUapsdParams->bkDeliveryEnabled == 0 &&
-            pUapsdParams->beDeliveryEnabled == 0 &&
-            pUapsdParams->viDeliveryEnabled == 0 &&
-            pUapsdParams->voDeliveryEnabled == 0 &&
-            pUapsdParams->bkTriggerEnabled == 0 &&
-            pUapsdParams->beTriggerEnabled == 0 &&
-            pUapsdParams->viTriggerEnabled == 0 &&
-            pUapsdParams->voTriggerEnabled == 0)
-        {
-            limLog(pMac, LOGW, FL("No Need to enter UAPSD since Trigger "
-                 "Enabled and Delivery Enabled Mask is zero for all ACs"));
-            retStatus = eSIR_PMM_INVALID_REQ;
-            return retStatus;
-        }
 
         PELOGW(pmmLog (pMac, LOGW, FL("pmmUapsd: Sending WDA_ENTER_UAPSD_REQ to HAL"));)
     }
@@ -2789,10 +2690,10 @@ void pmmImpsUpdatePwrSaveStats(tpAniSirGlobal pMac)
 
     pMac->pmm.ImpsAvgTimeAwake = ((pMac->pmm.ImpsAvgTimeAwake * pMac->pmm.ImpsCntSleep) + TimeAwake) / (pMac->pmm.ImpsCntSleep + 1);
 
-*/
     (pMac->pmm.ImpsCntSleep)++;
 
     return;
+*/
 }
 
 
@@ -2836,10 +2737,10 @@ void pmmImpsUpdateWakeupStats (tpAniSirGlobal pMac)
 
     pMac->pmm.ImpsAvgSleepTime = ( ( (pMac->pmm.ImpsAvgSleepTime * pMac->pmm.ImpsCntAwake) + SleepTime) / (pMac->pmm.ImpsCntAwake + 1));
 
-*/
     (pMac->pmm.ImpsCntAwake)++;
 
     return;
+*/
 }
 
 // Collects number of times error occurred while going to sleep mode
