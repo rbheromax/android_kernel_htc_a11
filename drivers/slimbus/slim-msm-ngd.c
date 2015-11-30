@@ -1008,42 +1008,22 @@ static void ngd_laddr_lookup(struct work_struct *work)
 	struct slim_controller *ctrl = &dev->ctrl;
 	struct slim_device *sbdev;
 	struct list_head *pos, *next;
-	int ret, i = 0;
-	while (!kthread_should_stop()) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		wait_for_completion(&dev->qmi.slave_notify);
-		/* Probe devices for first notification */
-		if (!i) {
-			i++;
-			dev->err = 0;
-			if (dev->dev->of_node)
-				of_register_slim_devices(&dev->ctrl);
-
-			/*
-			 * Add devices registered with board-info now that
-			 * controller is up
-			 */
-			slim_ctrl_add_boarddevs(&dev->ctrl);
-		} else {
-			slim_framer_booted(ctrl);
+	int i;
+	slim_framer_booted(ctrl);
+	mutex_lock(&ctrl->m_ctrl);
+	list_for_each_safe(pos, next, &ctrl->devs) {
+		int ret = 0;
+		sbdev = list_entry(pos, struct slim_device, dev_list);
+		mutex_unlock(&ctrl->m_ctrl);
+		for (i = 0; i < LADDR_RETRY; i++) {
+			ret = slim_get_logical_addr(sbdev, sbdev->e_addr,
+					6, &sbdev->laddr);
+			if (!ret)
+				break;
+			else 
+				msleep(20);
 		}
 		mutex_lock(&ctrl->m_ctrl);
-		list_for_each_safe(pos, next, &ctrl->devs) {
-			int j;
-			sbdev = list_entry(pos, struct slim_device, dev_list);
-			mutex_unlock(&ctrl->m_ctrl);
-			for (j = 0; j < LADDR_RETRY; j++) {
-				ret = slim_get_logical_addr(sbdev,
-						sbdev->e_addr,
-						6, &sbdev->laddr);
-				if (!ret)
-					break;
-				else /* time for ADSP to assign LA */
-					msleep(20);
-			}
-			mutex_lock(&ctrl->m_ctrl);
-		}
-		mutex_unlock(&ctrl->m_ctrl);
 	}
 	mutex_unlock(&ctrl->m_ctrl);
 }
