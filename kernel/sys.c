@@ -42,6 +42,7 @@
 #include <linux/ctype.h>
 #include <linux/mm.h>
 #include <linux/mempolicy.h>
+#include <linux/sched.h>
 
 #include <linux/compat.h>
 #include <linux/syscalls.h>
@@ -1031,7 +1032,7 @@ static int override_release(char __user *release, size_t len)
 			rest++;
 		}
 		v = ((LINUX_VERSION_CODE >> 8) & 0xff) + 40;
-		copy = min(sizeof(buf), max_t(size_t, 1, len));
+		copy = clamp_t(size_t, len, 1, sizeof(buf));
 		copy = scnprintf(buf, copy, "2.6.%u%s", v, rest);
 		ret = copy_to_user(release, buf, copy + 1);
 	}
@@ -1652,17 +1653,22 @@ static int prctl_set_vma_anon_name(unsigned long start, unsigned long end,
 	int unmapped_error = 0;
 	int error = -EINVAL;
 
+	/*
+	 * If the interval [start,end) covers some unmapped address
+	 * ranges, just ignore them, but return -ENOMEM at the end.
+	 * - this matches the handling in madvise.
+	 */
 	vma = find_vma_prev(current->mm, start, &prev);
 	if (vma && start > vma->vm_start)
 		prev = vma;
 
 	for (;;) {
-		
+		/* Still start < end. */
 		error = -ENOMEM;
 		if (!vma)
 			return error;
 
-		
+		/* Here start < (end|vma->vm_end). */
 		if (start < vma->vm_start) {
 			unmapped_error = -ENOMEM;
 			start = vma->vm_start;
@@ -1670,12 +1676,12 @@ static int prctl_set_vma_anon_name(unsigned long start, unsigned long end,
 				return error;
 		}
 
-		
+		/* Here vma->vm_start <= start < (end|vma->vm_end) */
 		tmp = vma->vm_end;
 		if (end < tmp)
 			tmp = end;
 
-		
+		/* Here vma->vm_start <= start < tmp <= (end|vma->vm_end). */
 		error = prctl_update_vma_anon_name(vma, &prev, start, end,
 				(const char __user *)arg);
 		if (error)
@@ -1688,7 +1694,7 @@ static int prctl_set_vma_anon_name(unsigned long start, unsigned long end,
 			return error;
 		if (prev)
 			vma = prev->vm_next;
-		else	
+		else	/* madvise_remove dropped mmap_sem */
 			vma = find_vma(current->mm, start);
 	}
 }
@@ -1705,7 +1711,7 @@ static int prctl_set_vma(unsigned long opt, unsigned long start,
 		return -EINVAL;
 	len = (len_in + ~PAGE_MASK) & PAGE_MASK;
 
-	
+	/* Check to see whether len was rounded up from small -ve to zero */
 	if (len_in && !len)
 		return -EINVAL;
 
@@ -1735,6 +1741,7 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		unsigned long, arg4, unsigned long, arg5)
 {
 	struct task_struct *me = current;
+	struct task_struct *tsk;
 	unsigned char comm[sizeof(me->comm)];
 	long error;
 
@@ -1820,7 +1827,7 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 			error = prctl_get_seccomp();
 			break;
 		case PR_SET_SECCOMP:
-			error = prctl_set_seccomp(arg2);
+			error = prctl_set_seccomp(arg2, (char __user *)arg3);
 			break;
 		case PR_GET_TSC:
 			error = GET_TSC_CTL(arg2);
@@ -1894,6 +1901,36 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		case PR_SET_VMA:
 			error = prctl_set_vma(arg2, arg3, arg4, arg5);
 			break;
+		case PR_SET_TIMERSLACK_PID:
+			if (current->pid != (pid_t)arg3 &&
+					!capable(CAP_SYS_NICE))
+				return -EPERM;
+			rcu_read_lock();
+			tsk = find_task_by_pid_ns((pid_t)arg3, &init_pid_ns);
+			if (tsk == NULL) {
+				rcu_read_unlock();
+				return -EINVAL;
+			}
+			get_task_struct(tsk);
+			rcu_read_unlock();
+			if (arg2 <= 0)
+				tsk->timer_slack_ns =
+					tsk->default_timer_slack_ns;
+			else
+				tsk->timer_slack_ns = arg2;
+			put_task_struct(tsk);
+			error = 0;
+			break;
+		case PR_SET_NO_NEW_PRIVS:
+			if (arg2 != 1 || arg3 || arg4 || arg5)
+				return -EINVAL;
+
+			task_set_no_new_privs(current);
+			break;
+		case PR_GET_NO_NEW_PRIVS:
+			if (arg2 || arg3 || arg4 || arg5)
+				return -EINVAL;
+			return task_no_new_privs(current) ? 1 : 0;
 		default:
 			error = -EINVAL;
 			break;

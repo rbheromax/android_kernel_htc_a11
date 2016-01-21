@@ -17,6 +17,7 @@
 #include <kgsl_device.h>
 
 #include "kgsl_trace.h"
+#include "adreno.h"
 
 static inline struct list_head *_get_list_head(struct kgsl_device *device,
 		struct kgsl_context *context)
@@ -163,13 +164,21 @@ int kgsl_add_event(struct kgsl_device *device, u32 id, u32 ts,
 		context = kgsl_context_get(device, id);
 		if (context == NULL)
 			return -EINVAL;
-	}
+		}
+	/*
+	 * If the caller is creating their own timestamps, let them schedule
+	 * events in the future. Otherwise only allow timestamps that have been
+	 * queued.
+	 */
+	if (context == NULL ||
+		((context->flags & KGSL_CONTEXT_USER_GENERATED_TS) == 0)) {
+		queued = kgsl_readtimestamp(device, context,
+			KGSL_TIMESTAMP_QUEUED);
 
-	queued = kgsl_readtimestamp(device, context, KGSL_TIMESTAMP_QUEUED);
-
-	if (timestamp_cmp(ts, queued) > 0) {
-		kgsl_context_put(context);
-		return -EINVAL;
+		if (timestamp_cmp(ts, queued) > 0) {
+			kgsl_context_put(context);
+			return -EINVAL;
+		}
 	}
 
 	cur_ts = kgsl_readtimestamp(device, context, KGSL_TIMESTAMP_RETIRED);
